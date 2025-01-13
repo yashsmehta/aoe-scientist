@@ -14,7 +14,8 @@ dependencies = [
     "backoff>=2.2.1",
     "requests>=2.31.0",
     "pytest>=7.0.0",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "omegaconf>=2.3.0"
 ]
 
 [project.optional-dependencies]

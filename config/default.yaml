@@ -1,0 +1,4 @@
+mode: generate
+provider: deepseek
+idea_path: null
+rag: false 
