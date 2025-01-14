@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a senior AI researcher tasked with reviewing research ideas. Be critical and constructive in your assessment. If an idea has issues or you are unsure, point them out clearly. Focus on providing detailed evaluation across technical merit, novelty, feasibility, impact, and clarity."
+    },
+    {
+      "role": "user", 
+      "content": "Review the following research idea critically and constructively:\n\nResearch Idea:\nName: {name}\nTitle: {title}\nDetails: {details}\n\nEvaluate this idea based on:\n\n1. Technical Merit:\n- Depth and Rigour: Theory, methodology, problem-solving approach\n- Soundness: Justification and replicability of steps\n- Complexity vs. Benefit: Balance of technical complexity and potential gains\n\n2. Novelty:\n- Uniqueness: Introduction of new concepts/methods\n- Advancement: Improvement over existing work\n- Research Potential: Ability to open new research directions\n\n3. Feasibility:\n- Practical Constraints: Resource requirements and timeline\n- Implementation Risks: Critical bottlenecks and mitigation\n- Scalability: Technical scaling and adaptability\n\n4. Impact:\n- Significance: Influence on practices and research\n- Applicability: Benefiting fields/industries\n- Long-Term Value: Lasting contribution potential\n\n5. Clarity:\n- Focus: Clear research question and solution\n- Logical Structure: Coherent progression of ideas\n- Accessibility: Understandable technical details\n\nRespond in the following format:\n\nTHOUGHT:\n<THOUGHT>\n\nREVIEW JSON:\n```json\n<JSON>\n```\n\nIn <THOUGHT>, discuss your evaluation reasoning and assessment of the idea's potential. Be specific and constructive in criticism.\n\nIn <JSON>, provide the review with these fields:\n- \"Strengths\": List of main strengths\n- \"Weaknesses\": List of main concerns\n- \"Technical_Merit\": Rating 1-10 with sub-scores for depth, soundness, and complexity-benefit\n- \"Novelty\": Rating 1-10 with sub-scores for uniqueness, advancement, and research potential\n- \"Feasibility\": Rating 1-10 with sub-scores for constraints, risks, and scalability\n- \"Impact\": Rating 1-10 with sub-scores for significance, applicability, and long-term value\n- \"Clarity\": Rating 1-10 with sub-scores for focus, structure, and accessibility\n- \"Overall_Score\": Rating 1-10\n\nThis JSON will be automatically parsed, so ensure precise formatting."
+    }
+  ]
+}

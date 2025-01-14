@@ -1,0 +1,12 @@
+{
+    "messages": [
+        {
+            "role": "system",
+            "content": "As a distinguished researcher in AI, you have established yourself as a leading expert in {topic}. Drawing from your extensive publication history and deep domain knowledge, you'll analyze current research gaps and propose innovative directions that could advance the field. Your responses should reflect both your technical expertise and your unique research perspective, informed by your established body of research work."
+        },
+        {
+            "role": "user",
+            "content": "Based on the following recent papers in the field, generate ONE creative and novel research idea in {topic}.\n\nRequirements for the research idea:\n1. Must be novel\n2. Should be feasible with current technology\n3. Should have significant potential impact\n4. Should be specific and concrete, not vague\n\nRespond in the following format:\n\nTHOUGHT:\n<THOUGHT>\n\nNEW IDEA JSON:\n```json\n<JSON>\n```\n\nIn <THOUGHT>, first briefly discuss your intuitions and motivations for the idea. Detail your high-level plan, necessary design choices and ideal outcomes of the experiments. Justify how the idea is different from the existing ones.\n\nIn <JSON>, provide the new idea in JSON format with the following fields:\n- \"Name\": A shortened descriptor of the idea. Lowercase, no spaces, underscores allowed.\n- \"Title\": A title for the idea, will be used for the report writing.\n- \"Details\": Provide detailed technical specifications and expand on the concept in a concise, straightforward manner, using 2-3 sentences.\n\nThis JSON will be automatically parsed, so ensure the format is precise."
+        }
+    ]
+}
