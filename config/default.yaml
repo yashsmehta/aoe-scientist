@@ -1,5 +1,5 @@
 mode: generate
-provider: deepseek
 idea_path: null
 topic: "Neural Architecture Search (NAS)"
+researcher: "David Ha"
 rag: false 

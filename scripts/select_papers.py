@@ -59,7 +59,7 @@ def is_name_match(name1, name2, threshold=80):
     
     return False
 
-def select_optimal_papers(df, researcher_name, n_papers=10, alpha=0.6, beta=0.4, penalty_weight=1.0):
+def select_optimal_papers(df, researcher_name, n_papers=5, alpha=0.6, beta=0.4, penalty_weight=1.0):
     """
     Selects up to n_papers from df in which the given researcher_name
     is the first or last author within the last 5 years. We prioritize
