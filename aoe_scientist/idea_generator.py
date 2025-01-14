@@ -65,6 +65,7 @@ The idea must be formatted according to the schema provided in the system messag
 def generate_research_idea(cfg, chat, rag=True):
     """Generate a novel research idea based on existing papers."""
     response_schemas = [
+        ResponseSchema(name="Thought", description="The intuition, motivation and high-level plan for the research idea."),
         ResponseSchema(name="Name", description="A shortened descriptor of the idea. Lowercase, no spaces, underscores allowed."),
         ResponseSchema(name="Title", description="A title for the idea, will be used for the report writing."),
         ResponseSchema(name="Details", description="Provide detailed technical specifications and potential implementation details. Expand on the concept in a concise, straightforward manner, using 2-3 sentences."),
@@ -103,8 +104,6 @@ def generate_research_idea(cfg, chat, rag=True):
         ]
     
     response = chat.invoke(messages)
-    print(response.content)
-    exit()
     
     try:
         return output_parser.parse(response.content)
