@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sentence_transformers import SentenceTransformer
 from thefuzz import fuzz
 import re
 
@@ -113,21 +113,18 @@ def select_optimal_papers(df, researcher_name, n_papers=10, alpha=0.6, beta=0.4,
     # Base score combines recency and citation metrics
     filtered_df['base_score'] = alpha * filtered_df['recency_score'] + beta * filtered_df['citation_score']
 
-    # Compute TF-IDF similarities for the diversity penalty
+    # Compute semantic embeddings for the diversity penalty
     documents = (
         filtered_df
         .apply(lambda x: f"{x['title']} {x['abstract']} {x['authors']}", axis=1)
         .fillna("")
     )
 
-    tfidf = TfidfVectorizer(
-        stop_words='english',
-        ngram_range=(1, 2),
-        max_features=10000,
-        norm='l2'
-    )
-    tfidf_matrix = tfidf.fit_transform(documents)
-    similarity_matrix = (tfidf_matrix * tfidf_matrix.T).toarray()
+    # use sentence transformer to generate embeddings
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    embeddings = model.encode(documents.tolist(), show_progress_bar=False)
+    embeddings = embeddings / np.linalg.norm(embeddings, axis=1)[:, np.newaxis]
+    similarity_matrix = np.dot(embeddings, embeddings.T)
 
     # Map from dataframe index to row in the similarity matrix
     idx_to_matrix = {idx: i for i, idx in enumerate(filtered_df.index)}
