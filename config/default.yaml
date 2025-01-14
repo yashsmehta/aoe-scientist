@@ -1,4 +1,5 @@
 mode: generate
 provider: deepseek
 idea_path: null
+topic: "Neural Architecture Search (NAS)"
 rag: false 

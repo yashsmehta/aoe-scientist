@@ -23,6 +23,7 @@ def create_client(provider: str, temperature: float = 0.75) -> ChatOpenAI:
             "class": ChatOpenAI,
             "api_key_env": "OPENAI_API_KEY",
             "model": "gpt-4o"
+            # "model": "o1-preview"
         }
     }
     
@@ -40,9 +41,11 @@ def create_client(provider: str, temperature: float = 0.75) -> ChatOpenAI:
     # Create model instance
     kwargs = {
         "model": config["model"],
-        "temperature": temperature,
         "api_key": api_key
     }
+    
+    if config["model"] != "o1-preview":
+        kwargs["temperature"] = temperature
     
     if "base_url" in config:
         kwargs["base_url"] = config["base_url"]
