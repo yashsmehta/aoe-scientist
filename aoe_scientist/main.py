@@ -9,7 +9,7 @@ if __name__ == "__main__":
     
     if cfg['mode'] == 'generate':
         chat = create_client("deepseek", temperature=1)
-        output = generate_research_idea(chat, cfg)
+        output = generate_research_idea(cfg, chat, rag=True)
         print(output)
         save_json(output, "data/ideas.json")
 
