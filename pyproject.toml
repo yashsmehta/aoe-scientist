@@ -18,6 +18,7 @@ dependencies = [
     "omegaconf>=2.3.0",
     "scikit-learn>=1.6.1",
     "scholarly>=1.7.11",
+    "thefuzz>=0.22.1",
 ]
 
 [project.optional-dependencies]
