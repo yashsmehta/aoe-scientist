@@ -57,21 +57,12 @@ def save_json(data, filepath):
     
     print(f"Results appended to: {filepath}")
 
-def save_df(data_dict, filepath):
-    """Save or update a pandas DataFrame with new data.
-    
-    Args:
-        data_dict: Dictionary containing new data to add as a row
-        filepath: Path to save the CSV file
-    """
+def save_df(data_df, filepath):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     
-    try:
-        df = pd.read_csv(filepath)
-        df = pd.concat([df, pd.DataFrame([data_dict])], ignore_index=True)
-    except FileNotFoundError:
-        df = pd.DataFrame([data_dict])
+    if os.path.exists(filepath):
+        existing_df = pd.read_csv(filepath)
+        data_df = pd.concat([existing_df, data_df], ignore_index=True)
     
-    df.to_csv(filepath, index=False)
+    data_df.to_csv(filepath, mode='w', index=False)
     print(f"DataFrame updated and saved to: {filepath}")
-    return df

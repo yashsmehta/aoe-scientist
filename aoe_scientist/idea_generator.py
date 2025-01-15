@@ -61,8 +61,12 @@ Justify how the idea is different from the existing ones.
 #### NEW IDEA JSON
 The idea must be formatted according to the schema provided in the system message."""
 
-def generate_research_idea(cfg, chat, rag=True):
-    """Generate a novel research idea based on existing papers."""
+def generate_research_idea(chat, cfg):
+    """Generate a novel research idea based on existing papers.
+    
+    Returns:
+        pd.DataFrame: DataFrame containing the generated idea
+    """
     response_schemas = [
         ResponseSchema(name="Thought", description="The intuition, motivation and high-level plan for the research idea."),
         ResponseSchema(name="Name", description="A shortened descriptor of the idea. Lowercase, no spaces, underscores allowed."),
@@ -72,12 +76,12 @@ def generate_research_idea(cfg, chat, rag=True):
     output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
     format_instructions = output_parser.get_format_instructions()
     
-    if rag:
+    if cfg['rag']:
         # Load RAG prompt and papers
-        df = pd.read_csv("data/scholar_papers.csv")
-        df = df[df['researcher'].apply(lambda x: is_name_match(x, cfg['researcher']))]
-        df = df[['title', 'year', 'abstract']]
-        papers_str = df.to_json(orient='records', indent=2)
+        papers_df = pd.read_csv("data/scholar_papers.csv")
+        papers_df = papers_df[papers_df['researcher'].apply(lambda x: is_name_match(x, cfg['researcher']))]
+        papers_df = papers_df[['title', 'year', 'abstract']]
+        papers_str = papers_df.to_json(orient='records', indent=2)
         
         messages = [
             SystemMessage(content=RAG_SYSTEM_TEMPLATE.format(
@@ -105,6 +109,17 @@ def generate_research_idea(cfg, chat, rag=True):
     response = chat.invoke(messages)
     
     try:
-        return output_parser.parse(response.content)
+        idea = output_parser.parse(response.content)
+        idea_dict = {
+            'name': idea.get('Name', ''),
+            'generate_llm': cfg['generate_llm'],
+            'researcher': cfg['researcher'] if cfg['rag'] else None,
+            'rag': cfg['rag'],
+            'title': idea.get('Title', ''),
+            'details': idea.get('Details', '')
+        }
+        return pd.DataFrame([idea_dict])
     except Exception as e:
-        raise ValueError(f"Failed to parse response: {str(e)}\nResponse: {response.content}")
+        print(f"Warning: Failed to parse response: {str(e)}\nResponse: {response.content}")
+        print("Skipping this idea generation")
+        return pd.DataFrame()

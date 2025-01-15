@@ -8,7 +8,7 @@ from aoe_scientist.utils import save_df
 # Prompt templates for idea review
 REVIEW_SYSTEM_TEMPLATE = """You are a senior AI research reviewer tasked with critically evaluating research ideas in the field of {topic}. 
 Your evaluation must be thorough, unbiased, and critical - your research standards are extremely high. Note, many of the ideas might sound good, but ultimately, 
-not make any sense in {topic} - be very critical of such ideas (dont shy away from giving low scores). Be wise, and critically 
+not make any sense in {topic} - be very critical of such ideas (dont shy away from giving low scoresJ). Be wise, and critically 
 evaluate the ideas on ones that actually make sense. Use your knowledge of the field to critically evaluate the ideas.
 
 For each metric, provide a score from 1-10 and justify your reasoning:
@@ -109,47 +109,44 @@ def create_review_chain(chat, topic: str):
     return review_prompt | chat | output_parser | convert_scores_to_int
 
 
-def review_idea(chat, cfg):
+def review_ideas(chat, cfg):
     """Review a research idea and save results to a dataframe."""
-    with open(f"data/ideas/{cfg['researcher']}.json", "r") as f:
-        ideas = json.load(f)
-        idea = ideas[0] if isinstance(ideas, list) else ideas
-    
+    ideas = pd.read_csv(f"data/ideas.csv", index_col=False)
     review_chain = create_review_chain(chat, cfg['topic'])
     
     max_retries = 3
     last_error = None
     
-    for attempt in range(max_retries):
-        try:
-            response = review_chain.invoke({
-                "title": idea["Title"],
-                "details": idea["Details"],
-            })
-            review = Review(**response)
-            
-            # Create review data for dataframe
-            review_data = {
-                'name': idea["Name"],
-                'title': idea["Title"],
-                'researcher': cfg['researcher'],
-                'review_llm': cfg.get('review_llm', 'deepseek'),
-                'technical_merit': review.technical_merit,
-                'novelty': review.novelty,
-                'feasibility': review.feasibility,
-                'impact': review.impact,
-                'clarity': review.clarity,
-                'overall_score': review.overall_score,
-                'criticism': review.criticism
-            }
-            
-            df = save_df(review_data, 'data/reviews.csv')
-            
-            return review, df
-            
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                continue
-    
-    raise ValueError(f"Failed review after {max_retries} attempts. Last error: {str(last_error)}")
+    for _, idea in ideas.iterrows():
+        for attempt in range(max_retries):
+            try:
+                response = review_chain.invoke({
+                    "title": idea.title,
+                    "details": idea.details,
+                })
+                review = Review(**response)
+                
+                # Create review data for dataframe
+                review_data = {
+                    'name': idea.name,
+                    'title': idea.title,
+                    'researcher': idea.researcher,
+                    'rag': idea.rag,
+                    'review_llm': cfg.get('review_llm', 'deepseek'),
+                    'technical_merit': review.technical_merit,
+                    'novelty': review.novelty,
+                    'feasibility': review.feasibility,
+                    'impact': review.impact,
+                    'clarity': review.clarity,
+                    'overall_score': review.overall_score
+                }
+                review_df = pd.DataFrame([review_data])
+                return review_df
+                
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    continue
+        
+    print(f"Warning: Failed review after {max_retries} attempts. Last error: {str(last_error)}")
+    return pd.DataFrame()
