@@ -2,6 +2,7 @@
 import os
 from omegaconf import OmegaConf
 import json
+import pandas as pd
 from dotenv import load_dotenv
 
 
@@ -15,15 +16,23 @@ def setup_config(file_path="config/default.yaml"):
     4. Default config
     """
     load_dotenv()
-    default_conf = OmegaConf.load(file_path)
-    custom_conf = OmegaConf.from_cli()
-    config = OmegaConf.merge(default_conf, custom_conf)
-
-    if config.mode not in ['generate', 'review']:
-        raise ValueError(f"Invalid mode: {config.mode}. Must be 'generate' or 'review'")
     
-    if config.mode == 'review' and not config.idea_path:
-        raise ValueError("idea_path must be specified in review mode")
+    # Load default config
+    default_conf = OmegaConf.load(file_path)
+    
+    # Create CLI config with structured format
+    cli_conf = OmegaConf.from_dotlist([
+        f"{k}={v}" for k, v in OmegaConf.from_cli().items()
+    ])
+    
+    # Merge configs with CLI taking precedence
+    config = OmegaConf.merge(default_conf, cli_conf)
+
+    if 'mode' not in config or config.mode not in ['generate', 'review']:
+        raise ValueError(f"Invalid mode: {getattr(config, 'mode', None)}. Must be 'generate' or 'review'")
+    
+    if config.mode == 'review' and not hasattr(config, 'idea_path'):
+        config.idea_path = "data/ideas.json"  # Set default path
         
     return OmegaConf.to_container(config)
 
@@ -47,3 +56,22 @@ def save_json(data, filepath):
         json.dump(existing_data, f, indent=2)
     
     print(f"Results appended to: {filepath}")
+
+def save_df(data_dict, filepath):
+    """Save or update a pandas DataFrame with new data.
+    
+    Args:
+        data_dict: Dictionary containing new data to add as a row
+        filepath: Path to save the CSV file
+    """
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    try:
+        df = pd.read_csv(filepath)
+        df = pd.concat([df, pd.DataFrame([data_dict])], ignore_index=True)
+    except FileNotFoundError:
+        df = pd.DataFrame([data_dict])
+    
+    df.to_csv(filepath, index=False)
+    print(f"DataFrame updated and saved to: {filepath}")
+    return df

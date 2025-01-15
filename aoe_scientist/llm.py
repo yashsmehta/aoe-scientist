@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_client(provider: str, temperature: float = 0.75) -> ChatOpenAI:
+def create_client(llm_provider: str, temperature: float = 0.75) -> ChatOpenAI:
     provider_configs = {
         "deepseek": {
             "class": ChatOpenAI,
@@ -27,11 +27,11 @@ def create_client(provider: str, temperature: float = 0.75) -> ChatOpenAI:
         }
     }
     
-    provider = provider.lower()
-    if provider not in provider_configs:
-        raise ValueError(f"Provider {provider} not supported. Must be one of: {', '.join(provider_configs.keys())}")
+    llm_provider = llm_provider.lower()
+    if llm_provider not in provider_configs:
+        raise ValueError(f"Provider {llm_provider} not supported. Must be one of: {', '.join(provider_configs.keys())}")
     
-    config = provider_configs[provider]
+    config = provider_configs[llm_provider]
     
     # Get API key
     api_key = os.environ.get(config["api_key_env"])
@@ -51,5 +51,5 @@ def create_client(provider: str, temperature: float = 0.75) -> ChatOpenAI:
         kwargs["base_url"] = config["base_url"]
         
     chat = config["class"](**kwargs)
-    print(f"Using LangChain with {provider} model: {config['model']}")
+    print(f"Using LangChain with {llm_provider} model: {config['model']}")
     return chat

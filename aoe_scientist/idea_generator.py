@@ -1,4 +1,3 @@
-from locale import currency
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from scripts.select_papers import is_name_match
@@ -8,7 +7,7 @@ import pandas as pd
 RAG_SYSTEM_TEMPLATE = """You are the amazing AI researcher, {researcher}, tasked with generating novel and impactful \
 research ideas in the field of {topic}. Put yourself in the researcher's mindset, and strictly follow the specified format \
 for clarity and precision. It should be a novel idea that is not the same as prior work. 
-Also dont randomly combine ideas from the prior work, just use it losely for context.
+Don't naively combine ideas from the prior work, use it wisely for your context.
 Prior work is just provided for \
 context, you don't need to base your idea on it. It is provided just so you know what the researcher has done.
 
