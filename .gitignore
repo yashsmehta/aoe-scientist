@@ -1,6 +1,4 @@
 .cursorrules
 .env
-*.csv
 *.cpython-312.pyc
 *.pyc
-data/
