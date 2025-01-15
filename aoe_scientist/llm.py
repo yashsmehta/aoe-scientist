@@ -51,5 +51,4 @@ def create_client(llm_provider: str, temperature: float = 0.75) -> ChatOpenAI:
         kwargs["base_url"] = config["base_url"]
         
     chat = config["class"](**kwargs)
-    print(f"Using LangChain with {llm_provider} model: {config['model']}")
     return chat

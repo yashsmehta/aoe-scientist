@@ -1,9 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from pydantic import BaseModel, Field, field_validator
-import json
 import pandas as pd
-from aoe_scientist.utils import save_df
 
 # Prompt templates for idea review
 REVIEW_SYSTEM_TEMPLATE = """You are a senior AI research reviewer tasked with critically evaluating research ideas in the field of {topic}. 
@@ -17,7 +15,7 @@ For each metric, provide a score from 1-10 and justify your reasoning:
 - Feasibility (1-10): Judge practical implementability with current technology
 - Impact (1-10): Evaluate potential influence on the field and broader applications
 - Clarity (1-10): Rate how well-defined and clearly articulated the idea is
-- Criticism: What are the critisisms of the idea? and provide a well throught out explanation for your scores
+- Criticism: What are the critisisms of the idea? and provide a well thought out explanation for your scores. This should be a single paragraph (no sub-points, or sub-sections or lists)
 
 {format_instructions}"""
 
@@ -27,7 +25,7 @@ Title: {title}
 Description: {details}
 
 ### Review Guidelines:
-1. Analyze each aspect independently and objectively
+1. Critically analyze each aspect objectively and think deeply about the idea
 2. Support scores with specific examples and reasoning
 3. Consider both immediate and long-term implications
 4. Identify potential challenges and limitations
@@ -89,10 +87,10 @@ def create_review_chain(chat, topic: str):
         ("human", REVIEW_HUMAN_TEMPLATE)
     ])
     
-    # Properly bind format instructions
+    # Properly bind format instructions and add strict JSON formatting requirement
     review_prompt = review_prompt.partial(
         topic=topic,
-        format_instructions=format_instructions
+        format_instructions=format_instructions + "\nIMPORTANT: Return your response in valid JSON format with all properties in double quotes."
     )
     
     def convert_scores_to_int(response_dict):
@@ -106,47 +104,108 @@ def create_review_chain(chat, topic: str):
                     raise ValueError(f"Could not convert {field} to integer")
         return response_dict
     
-    return review_prompt | chat | output_parser | convert_scores_to_int
+    def extract_json_from_message(response):
+        """Extract JSON from AIMessage or string response."""
+        if hasattr(response, 'content'):  # Handle AIMessage
+            content = response.content
+        else:
+            content = str(response)
+            
+        # Try to find JSON-like structure
+        import re
+        import json
+        
+        # First try: Look for JSON block in markdown
+        json_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', content)
+        if json_match:
+            try:
+                return json.loads(json_match.group(1))
+            except json.JSONDecodeError:
+                pass
+                
+        # Second try: Look for any JSON-like structure
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+                
+        raise ValueError(f"Could not extract valid JSON from response: {content[:200]}...")
+    
+    return (
+        review_prompt 
+        | chat 
+        | extract_json_from_message 
+        | convert_scores_to_int
+    )
 
 
 def review_ideas(chat, cfg):
-    """Review a research idea and save results to a dataframe."""
+    """Review research ideas and save results to a dataframe."""
     ideas = pd.read_csv(f"data/ideas.csv", index_col=False)
     review_chain = create_review_chain(chat, cfg['topic'])
     
     max_retries = 3
-    last_error = None
+    reviews_df = pd.DataFrame()
     
-    for _, idea in ideas.iterrows():
+    for idx, idea in ideas.iterrows():
+        last_error = None
         for attempt in range(max_retries):
             try:
                 response = review_chain.invoke({
-                    "title": idea.title,
-                    "details": idea.details,
+                    "title": idea['title'],
+                    "details": idea['details'],
                 })
-                review = Review(**response)
                 
+                # Extra validation for response
+                if not isinstance(response, dict):
+                    raise ValueError(f"Expected dict response, got {type(response)}")
+                
+                review = Review(**response)
                 # Create review data for dataframe
                 review_data = {
-                    'name': idea.name,
-                    'title': idea.title,
-                    'researcher': idea.researcher,
-                    'rag': idea.rag,
-                    'review_llm': cfg.get('review_llm', 'deepseek'),
+                    'name': str(idea['name']),  # Ensure string type
+                    'title': str(idea['title']),
+                    'researcher': idea['researcher'],
+                    'rag': idea['rag'],
+                    'generate_llm': idea['generate_llm'],
+                    'review_llm': cfg.get('review_llm'),
                     'technical_merit': review.technical_merit,
                     'novelty': review.novelty,
                     'feasibility': review.feasibility,
                     'impact': review.impact,
                     'clarity': review.clarity,
-                    'overall_score': review.overall_score
+                    'overall_score': review.overall_score,
+                    'criticism': review.criticism
                 }
-                review_df = pd.DataFrame([review_data])
-                return review_df
+                print(f"\nReviewing idea {idx+1}/{len(ideas)}:")
+                print(review_data)
+                reviews_df = pd.concat([reviews_df, pd.DataFrame([review_data])], ignore_index=True)
+                break
                 
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
+                    print(f"Attempt {attempt+1} failed, retrying...")
                     continue
-        
-    print(f"Warning: Failed review after {max_retries} attempts. Last error: {str(last_error)}")
-    return pd.DataFrame()
+                print(f"Warning: Failed to review idea '{idea['name']}' after {max_retries} attempts.")
+                print(f"Error: {str(last_error)}")
+                # Add failed review with error info
+                review_data = {
+                    'name': str(idea['name']),
+                    'title': str(idea['title']),
+                    'researcher': idea['researcher'],
+                    'rag': idea['rag'],
+                    'review_llm': cfg.get('review_llm', 'deepseek'),
+                    'technical_merit': None,
+                    'novelty': None,
+                    'feasibility': None,
+                    'impact': None,
+                    'clarity': None,
+                    'overall_score': None,
+                    'criticism': f"Failed to review: {str(last_error)}"
+                }
+                reviews_df = pd.concat([reviews_df, pd.DataFrame([review_data])], ignore_index=True)
+    
+    return reviews_df

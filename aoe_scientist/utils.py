@@ -27,6 +27,8 @@ def setup_config(file_path="config/default.yaml"):
     
     # Merge configs with CLI taking precedence
     config = OmegaConf.merge(default_conf, cli_conf)
+    if config.rag == False:
+        config.researcher = None
 
     if 'mode' not in config or config.mode not in ['generate', 'review']:
         raise ValueError(f"Invalid mode: {getattr(config, 'mode', None)}. Must be 'generate' or 'review'")

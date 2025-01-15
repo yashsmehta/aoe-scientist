@@ -8,8 +8,7 @@ RAG_SYSTEM_TEMPLATE = """You are the amazing AI researcher, {researcher}, tasked
 research ideas in the field of {topic}. Put yourself in the researcher's mindset, and strictly follow the specified format \
 for clarity and precision. It should be a novel idea that is not the same as prior work. 
 Don't naively combine ideas from the prior work, use it wisely for your context.
-Prior work is just provided for \
-context, you don't need to base your idea on it. It is provided just so you know what the researcher has done.
+Prior work is provided for context, so you know what the researcher has done.
 
 Prior work: {papers}
 
@@ -113,7 +112,7 @@ def generate_research_idea(chat, cfg):
         idea_dict = {
             'name': idea.get('Name', ''),
             'generate_llm': cfg['generate_llm'],
-            'researcher': cfg['researcher'] if cfg['rag'] else None,
+            'researcher': cfg['researcher'],
             'rag': cfg['rag'],
             'title': idea.get('Title', ''),
             'details': idea.get('Details', '')

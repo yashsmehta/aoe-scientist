@@ -1,5 +1,4 @@
 mode: generate
-idea_path: null
 topic: "Neural Architecture Search (NAS)"
 researcher: "Mehta"
 rag: false 
