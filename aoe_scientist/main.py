@@ -6,6 +6,7 @@ from aoe_scientist.utils import setup_config, save_df
 
 def main():
     cfg = setup_config()
+    print("Running with LLM: ", cfg['generate_llm'], "RAG: ", cfg['rag'], "Researcher: ", cfg['researcher'])
     
     if cfg['mode'] == 'generate':
         chat = create_client(cfg['generate_llm'], temperature=1)
