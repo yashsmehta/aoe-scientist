@@ -1,8 +1,8 @@
-# AOE Scientist
+# AoE Scientist: Agents-of-Experts for Novel Scientific Idea Generation 🧪
 
-AI research idea generator and reviewer based on the AI Scientist paper.
+An AI-powered research idea generator and reviewer that emulates the thought processes of distinguished researchers. Inspired by the [AI Scientist work](https://sakana.ai/ai-scientist/), this system goes further by creating AI agents that embody the unique perspectives and methodologies of leading minds in their respective fields. The system employs multiple approaches to idea generation: direct researcher emulation, evolutionary optimization of agent populations for multi-objective idea quality, and dynamic collaboration networks that form research teams based on complementary strengths.
 
-## Installation
+## Installation 🛠️
 
 1. Install UV (if not already installed):
 ```bash
@@ -22,32 +22,60 @@ source .venv/bin/activate  # On Unix/macOS
 uv pip install .
 ```
 
-For development dependencies:
-```bash
-uv pip install ".[dev]"
-```
-
-## Usage
+## Usage 🚀
 
 1. Set your API keys:
 ```bash
 export OPENAI_API_KEY='your-openai-key'
 export ANTHROPIC_API_KEY='your-anthropic-key'
+export DEEPSEEK_API_KEY='your-deepseek-key'  # Optional
 ```
 
-2. Run the idea generator and reviewer:
+2. Generate ideas:
 ```bash
-python main.py
+python aoe_scientist/main.py mode=generate topic="neural architecture search" researcher="david ha" rag=true
 ```
 
-The system will:
-1. Generate a novel research idea using Claude or GPT-4
-2. Review the idea using multiple reviewers and reflection rounds
-3. Output both the idea and its review in a structured format
+3. Review generated ideas:
+```bash
+python aoe_scientist/main.py mode=review
+```
 
-## Project Structure
+## Project Structure 📁
 
-- `main.py`: Main script to run the idea generation and review pipeline
-- `idea_generator.py`: Research idea generation with reflections
-- `idea_reviewer.py`: Multi-reviewer idea evaluation system
-- `llm.py`: LLM client handling and utilities
+```
+aoe_scientist/
+├── main.py           # Main execution pipeline
+├── idea_generator.py # Research idea generation with RAG
+├── idea_reviewer.py  # Multi-criteria idea evaluation
+├── llm.py           # LLM client handling (OpenAI, Anthropic, DeepSeek)
+└── utils.py         # Helper functions and configuration
+
+data/
+├── ideas.csv        # Generated research ideas
+└── reviews.csv      # Idea evaluations and scores
+```
+
+## Roadmap 🗺️
+
+### Multi-Agent Evolution
+Implementing evolutionary algorithms to optimize a population of research agents:
+- Pareto-based selection across multiple objectives (technical merit, novelty)
+- Diversity maintenance through crowding distance
+- Clustering-based agent characteristics inheritance
+- Population evolution until diversity stabilization
+
+### Adaptive Collaboration Networks
+Dynamic research team formation based on past success:
+- Weighted collaboration network between researcher agents
+- Team formation based on relationship strength
+- Adaptive learning of successful partnerships
+- Network evolution towards optimal research collaborations
+
+## Contributing 🤝
+
+Contributions are welcome! Feel free to open issues or submit pull requests to help improve the system.
+
+## License 📄
+
+MIT
