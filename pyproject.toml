@@ -20,6 +20,7 @@ dependencies = [
     "scholarly>=1.7.11",
     "thefuzz>=0.22.1",
     "sentence-transformers>=2.5.1",
+    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]
