@@ -22,8 +22,6 @@ df_filtered['researcher'] = df_filtered['researcher'].fillna('No Researcher')
 # Create subplots
 metrics = ['technical_merit', 'novelty', 'feasibility', 'impact', 'clarity', 'overall_score']
 fig, axes = plt.subplots(2, 3, figsize=(20, 12))
-fig.suptitle('Idea Review Scores by Researcher Agent', 
-             fontsize=16, fontweight='bold', y=1.02)
 
 # Define colors for each metric
 colors = {
@@ -57,12 +55,13 @@ for idx, (ax, metric) in enumerate(zip(axes_flat, metrics)):
     )
     
     # Customize each subplot
-    ax.set_title(metric.replace('_', ' ').title(), pad=10, fontsize=12, color=colors[metric])
+    ax.set_title(metric.replace('_', ' ').title(), pad=10, fontsize=20, color=colors[metric], fontweight='bold')
     ax.set_xlabel('')
-    ax.set_ylabel('Score', fontsize=10)
+    ax.set_ylabel('Score', fontsize=30)
     
-    # Rotate x-axis labels properly
-    plt.setp(ax.get_xticklabels(), rotation=30, ha='right')
+    # Rotate x-axis labels properly and make them bold and larger
+    plt.setp(ax.get_xticklabels(), rotation=30, ha='right', fontsize=20, fontweight='bold')
+    plt.setp(ax.get_yticklabels(), fontsize=20, fontweight='bold')
     
     # Set y-axis range dynamically
     y_min = np.floor(min_val - 1)

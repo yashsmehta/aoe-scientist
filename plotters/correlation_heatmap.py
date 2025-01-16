@@ -90,22 +90,23 @@ hm = sns.heatmap(
         'label': 'Average Correlation',
         'shrink': 0.5,  # Make colorbar shorter
         'aspect': 5,    # Make colorbar thicker
-        'pad': 0.02    # Adjust spacing
+        'pad': 0.02,    # Adjust spacing
+        'label_kwargs': {'fontsize': 30, 'fontweight': 'bold'}  # Make colorbar label bold and larger
     }
 )
 
 # Customize labels
 plt.title('Inter-Rater Reliability of LLM Reviews', 
-          fontsize=11, 
+          fontsize=20, 
           fontweight='bold',
           pad=10)
 
-# Make LLM names title case
+# Make LLM names title case and larger
 llm_names = [name.title() for name in avg_correlation.index]
 plt.xticks(rotation=45, ha='right')
 plt.yticks(rotation=0)
-ax.set_xticklabels(llm_names, fontweight='medium')
-ax.set_yticklabels(llm_names, fontweight='medium')
+ax.set_xticklabels(llm_names, fontsize=30, fontweight='bold')
+ax.set_yticklabels(llm_names, fontsize=30, fontweight='bold')
 
 # Adjust layout
 plt.tight_layout()

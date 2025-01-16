@@ -40,18 +40,34 @@ hm = sns.heatmap(
     cmap=cmap,
     annot=True,
     fmt='.2f',
-    annot_kws={'size': 12, 'weight': 'bold'},
-    cbar_kws={'label': 'Variance'},
+    annot_kws={'size': 14, 'weight': 'bold'},
+    cbar_kws={
+        'label': 'Variance',
+        'shrink': 0.5,
+        'aspect': 5
+    },
     square=True
 )
 
+# Make LLM names title case and larger
+llm_names = [name.title() for name in llm_order]
+plt.xticks(rotation=45, ha='right')
+plt.yticks(rotation=0)
+ax = plt.gca()
+ax.set_xticklabels(llm_names, fontsize=20, fontweight='bold')
+ax.set_yticklabels(llm_names, fontsize=20, fontweight='bold')
+
+# Get the colorbar and modify its label properties
+cbar = ax.collections[0].colorbar
+cbar.ax.set_ylabel('Variance', fontsize=30, fontweight='bold')
+
 # Customize plot
 plt.title('Overall Score Variance\nby LLM Combinations', 
-          fontsize=16, 
+          fontsize=24, 
           fontweight='bold', 
           pad=20)
-plt.xlabel('Review LLM', fontsize=14, fontweight='bold')
-plt.ylabel('Generate LLM', fontsize=14, fontweight='bold')
+plt.xlabel('Review LLM', fontsize=30, fontweight='bold')
+plt.ylabel('Generate LLM', fontsize=30, fontweight='bold')
 
 # Save the plot
 plt.savefig('plotters/imgs/overall_score_variance_heatmap.png', 

@@ -62,13 +62,23 @@ unique_metrics = list(metrics.values())
 # Create subplot grid
 ncols = 3
 nrows = (len(unique_metrics) + ncols - 1) // ncols
-gs = plt.GridSpec(nrows, ncols, figure=fig)
+
+# Create a list to store axes for sharing
+axes = []
 
 # Plot each metric in its own subplot
 for i, metric in enumerate(unique_metrics):
     row = i // ncols
     col = i % ncols
-    ax = fig.add_subplot(gs[row, col])
+    
+    # For first row, create subplot normally
+    if row == 0:
+        ax = plt.subplot(nrows, ncols, i + 1)
+        # Store first row axes for sharing
+        axes.append(ax)
+    else:
+        # Share x axis with corresponding subplot from first row
+        ax = plt.subplot(nrows, ncols, i + 1, sharex=axes[col])
     
     for llm, style in style_dict.items():
         # Filter data for current metric and LLM
@@ -90,13 +100,26 @@ for i, metric in enumerate(unique_metrics):
     
     # Customize x-axis
     ax.set_xticks(range(len(researchers)))
-    ax.set_xticklabels(researchers, rotation=45, ha='right')
+    
+    # Only show x labels for bottom row
+    if row == nrows - 1:
+        ax.set_xticklabels(researchers, rotation=45, ha='right', fontsize=20, fontweight='bold')
+    else:
+        ax.set_xticklabels([])
+        ax.set_xlabel('')
+        ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)  # Hide x-axis tick marks and labels
     
     # Add grid
     ax.grid(True, linestyle='--', alpha=0.7)
     
-    # Set title
-    ax.set_title(metric, pad=20, fontsize=14, fontweight='bold')
+    # Set title and labels
+    ax.set_title(metric, pad=20, fontsize=20, fontweight='bold')
+    if col == 0:  # Only add y-label for leftmost plots
+        ax.set_ylabel('Score', fontsize=25)
+    
+    # Make y-axis ticks larger and bold
+    ax.tick_params(axis='y', labelsize=20)
+    plt.setp(ax.get_yticklabels(), fontweight='bold')
     
     # Let y-axis adjust automatically to data range
     ax.margins(y=0.1)

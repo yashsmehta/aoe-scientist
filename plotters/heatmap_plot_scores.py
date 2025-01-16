@@ -32,7 +32,7 @@ fig, axes = plt.subplots(2, 3, figsize=(20, 14))  # Made figure slightly taller
 plt.subplots_adjust(hspace=0.1)  # Increase vertical spacing between subplots
 
 fig.suptitle('Review Metrics Heatmap by LLM Combinations\n(Averaged Across All Researchers)', 
-             fontsize=16, fontweight='bold', y=0.95)  # Adjusted title position
+             fontsize=24, fontweight='bold', y=0.95)  # Adjusted title position
 
 # Flatten axes for easier iteration
 axes_flat = axes.flatten()
@@ -69,10 +69,11 @@ for idx, (metric, color) in enumerate(metrics.items()):
     # Customize each subplot
     axes_flat[idx].set_title(metric.replace('_', ' ').title(), 
                             pad=10, 
-                            fontsize=12, 
+                            fontsize=20, 
+                            fontweight='bold',
                             color=metrics[metric])
-    axes_flat[idx].set_xlabel('Review LLM', fontsize=14, fontweight='bold')
-    axes_flat[idx].set_ylabel('Generate LLM', fontsize=14, fontweight='bold')
+    axes_flat[idx].set_xlabel('Review LLM', fontsize=30, fontweight='bold')
+    axes_flat[idx].set_ylabel('Generate LLM', fontsize=30, fontweight='bold')
 
 # Save the plot
 plt.savefig('plotters/imgs/review_heatmaps.png', 
