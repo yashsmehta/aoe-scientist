@@ -21,6 +21,7 @@ dependencies = [
     "thefuzz>=0.22.1",
     "sentence-transformers>=2.5.1",
     "seaborn>=0.13.2",
+    "marker-pdf>=1.2.4",
 ]
 
 [project.optional-dependencies]
