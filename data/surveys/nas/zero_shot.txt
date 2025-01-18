@@ -1,0 +1,515 @@
+# Zero-Shot Neural Architecture Search: Challenges, Solutions, and Opportunities
+
+Guihong Li, *Student Member, IEEE,* Duc Hoang, *Student Member, IEEE,* Kartikeya Bhardwaj, *Member, IEEE,* Ming Lin, *Member, IEEE,* Zhangyang Wang, *Senior Member, IEEE,* Radu Marculescu, *Fellow, IEEE*
+
+**Abstract**—Recently, *zero-shot* (or *training-free*) Neural Architecture Search (NAS) approaches have been proposed to liberate NAS from the expensive training process. The key idea behind zero-shot NAS approaches is to design proxies that can predict the accuracy of some given networks without training the network parameters. The proxies proposed so far are usually inspired by recent progress in theoretical understanding of deep learning and have shown great potential on several datasets and NAS benchmarks. This paper aims to comprehensively review and compare the state-of-the-art (SOTA) zero-shot NAS approaches, with an emphasis on their hardware awareness. To this end, we first review the mainstream zero-shot proxies and discuss their theoretical underpinnings. We then compare these zero-shot proxies through large-scale experiments and demonstrate their effectiveness in both hardware-aware and hardware-oblivious NAS scenarios. Finally, we point out several promising ideas to design better proxies. Our source code and the list of related papers are available on https://github.com/SLDGroup/survey-zero-shot-nas.
+
+✦
+
+**Index Terms**—Neural Architecture Search, Zero-shot proxy, Hardware-aware neural network design
+
+# **1 INTRODUCTION**
+
+In recent years, deep neural networks have made significant breakthroughs in many applications, such as recommendation systems, image classification, and natural language modeling [1], [2], [3], [4], [5], [6], [7]. To automatically design high performance deep networks, *Neural Architecture Search* (NAS) has been proposed during the past decade [8], [9], [10], [11], [12]. Specifically, NAS boils down to solving an optimization problem with specific targets (*e.g.,* high classification accuracy) over a set of possible candidate architectures (search space) within a group of computational budgets. Recent breakthroughs in NAS simplify the trialand-error manual architecture design process and discover new deep network architectures with better performance and efficiency over hand-crafted ones [10], [11], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28]. Therefore, NAS has attracted significant attention from both academia and industry.
+
+One important application of NAS is to design hardware efficient deep models under various constraints, such as memory footprint, inference latency, and power consumption [29]. Roughly, existing NAS approaches can be categorized into three groups as shown in Figure 1: multishot NAS, one-shot NAS and zero-shot NAS. Multi-shot NAS methods involve training multiple candidate networks and are therefore time-consuming. It can take from a few hundred GPU hours [30] to thousands of GPU hours [31] in multi-shot NAS methods. One-shot NAS methods alleviate
+
+the computational burden by sharing candidate operations via a hyper-network [11], [32], [33], [34], [35], [36], [37]. As shown in Figure 2, one-shot NAS only needs to train a single hyper-network instead of multiple candidate architectures whose number is usually exponentially large. The orders of magnitude reduction in training time enables differentiable search to achieve competitive accuracy against multi-shot NAS, but with much lower search costs [11].
+
+Nevertheless, naively merging all candidate operations into a hyper-network is not efficient because the parameters of all operations need to be stored and updated during the search process. Consequently, the *weight-sharing* methods improve the search efficiency of NAS even further [13], [39], [40], [41], [42]. As shown in Figure 3, the key idea of weightsharing NAS is to share the parameters across different operations. Next, at each training step, a sub-network is sampled from the hyper-network and then the updated parameters are copied back to the hyper-network. By sharing the parameters of various sub-networks, this differentiable search approach significantly reduces the search costs to a few or tens of GPU hours [39].
+
+Though the differentiable search and weight-sharing have significantly improved the time efficiency of NAS, training is still required in one-shot NAS methods. In the last few years, the *zero-shot* NAS has been proposed to liberate NAS from parameter training entirely [43], [44], [45], [46], [47], [48], [49], [50], [51], [52].
+
+Compared to multi-shot and one-shot methods, zero-shot NAS has the following major advantages: (*i*) **Time efficiency**: zero-shot NAS utilizes some proxy as the model's test accuracy to eliminate the model training altogether during the search stage. Compared to model training, the computation costs of these proxies are much more lightweight. Therefore, zero-shot NAS can significantly reduce the costs of NAS while achieving comparable test accuracy as one-
+
+<sup>• <</sup>i>Guihong Li, Duc Hoang, Zhangyang Wang, and Radu Marculescu are with *the Department of Electrical and Computer Engineering, The University of Texas at Austin, TX, 78712. E-mail:* {*lgh, hoangduc, atlaswang, radum*}*@utexas.edu*
+
+<sup>• <</sup>i>Kartikeya Bhardwaj is with Qualcomm AI Research, an initiative of Qual*comm Technologies, Inc., CA, 92121. E-mail: kbhardwa@qti.qualcomm.com*
+
+<sup>• <</sup>i>Ming Lin is with Amazon, WA, 98004. E-mail: minglamz@amazon.com.
+
+<sup>• <</sup>i>Correspondence to Radu Marculescu (radum@utexas.edu).
+
+![](_page_1_Figure_1.jpeg)
+
+Fig. 1: Overview of existing NAS approaches. NAS is designed to search for optimal architectures with both good accuracy and high efficiency on real hardware. (Data collected from [38])
+
+![](_page_1_Figure_3.jpeg)
+
+Fig. 2: Illustration of differentiable neural architecture search. (1). Merge all candidate operations into a hyper-network with learnable weights for each operation. (2). Train the hyper-network and update the learnable weights for each operation. (3) Generate the final results by selecting the operations with the highest weight values (boldest edges). (Adapted from [11])
+
+shot and multi-shot NAS approaches (see Figure 1). (*ii*) **Interpretability**: Clearly, the quality of the accuracy proxy ultimately determines the performance of zero-shot NAS. The design of an accuracy proxy for zero-shot NAS is usually inspired by some theoretical analysis of deep neural networks thus deepening the theoretical understanding of why certain networks may work better. For example, Bhardwaj et al. developed the first zero-shot NAS approach by analyzing the topological properties of deep networks [53]; some recent approaches use the number of linear regions to approximate the complexity of a deep neural network [54]. Moreover, the
+
+![](_page_1_Figure_6.jpeg)
+
+Fig. 3: Illustration of weight-sharing mechanism. The parameters of relatively simple operations are obtained from complex operations, *i.e.,* super kernel. As shown, different operations share the parameters from the super kernel. (Adapted from [39])
+
+connection between the gradient of a network at random initialization and the accuracy of that network after training are widely explored as proxies of the model's test accuracy in zero-shot NAS [55].
+
+Based on these overarching observations, this paper aims to comprehensively analyze existing hardware-aware zeroshot NAS methods. Starting from the theoretical foundations of deep learning, we first investigate various proxies of test accuracy and their theoretical underpinnings. Then, we introduce several popular benchmarks for evaluating zero-shot NAS methods. Moreover, we demonstrate their effectiveness when applied to hardware-aware NAS; notably, we reveal fundamental limitations of existing proxies. Finally, we discuss several potential research directions for hardware-aware zero-shot NAS. Overall, this paper makes the following contributions:
+
+- We review existing proxies for zero-shot NAS and provide theoretical insights behind these proxies. We categorize the existing accuracy proxies into (*i*) gradient-based proxies and (*ii*) gradient-free proxies.
+- We conduct direct comparisons of various zero-shot proxies against two naive proxies, *i.e.,* #Params and #FLOPs, and reveal a fundamental limitation of many existing proxies: they correlate much worse with the test accuracy in constrained search settings (*i.e.,* when considering only networks of high accuracies) compared to unconstrained settings (*i.e.,* considering all architectures in the given search space).
+- We further conduct a thorough study including proxy design, benchmarks, and real hardware profiling for zero-shot NAS. We show that a few proxies have a better correlation with the test accuracy than these two naive proxies (#Params and #FLOPs) on the top-performing architectures such as ResNets and MobileNets.
+- We discuss the limitations of existing zero-shot proxies and NAS benchmarks; we then outline a few possible directions for future research.
+
+In comparison to other existing zero-shot NAS surveys [56], [57], [58], [59], [60], [61], [62], [63], [64], we not only cover all existing proxies, but also provide a deep analysis of
+
+the theoretical underpinning behind them. We believe that understanding the theoretical design considerations behind these proxies is very important for future improvements. Additionally, this is the first work to comprehensively compare these zero-shot proxies on large scale tasks like ImageNet-1K classification, COCO object detection, and ADE20K semantic segmentation. Furthermore, we are the first to explore the potential applicability of these zero-shot proxies to Vision Transformers. Last but not least, we have conducted detailed comparisons for the first time when applying zero-shot NAS in hardware-aware scenarios. This is crucial for deploying the zero-shot approaches in practice, especially for edge-AI applications.
+
+The remaining paper is organized as follows. We introduce zero-shot proxies in Section 2. Section 3 surveys existing NAS benchmarks. Hardware performance predictor is presented in Section 3.2. We evaluate various zero-shot proxies under diverse settings in Section 4 and point out future research directions. We conclude the paper in Section 5.
+
+## **2 ZERO-SHOT PROXIES**
+
+The goal of zero-shot NAS is to design proxies that can rank the accuracy of candidate network architectures at the initialization stage, *i.e.,* without training, such that we can replace the expensive training process in NAS with some computation-efficient alternatives. Hence, the proxy for the accuracy ranking is the key factor of zero-shot NAS.
+
+#### **2.1 Theoretical Underpinning of Proxies**
+
+Before we dive deep into the details of existing zero-shot proxies, let us first establish the foundational principles for designing a good zero-shot proxy. Indeed, an ideal accuracy proxy should address three primary aspects [65], [66]:
+
+- **Expressive Capacity**: The proxy should reflect how well the deep network can capture and model complex patterns and relationships within the data, which can be crucial for complex tasks like large-scale datasets (e.g., ImageNet-1K and COCO) [67], [68].
+- **Generalization Capacity**: The proxy should also reflect the network ability to generalize from the training data to unseen or out-of-distribution data. A network with a high generalization capacity should not only perform well on the training data but also on new examples, indicating that it has learned meaningful, transferable representations [69], [70], [71].
+- **Trainability and Convergence**: The proxy should also indicate how quickly the network converges to a desirable performance level. Faster convergence indicates that the network is efficiently adapting to the training data and task at hand, which is essential for practical applications since training is typically expensive [72], [73], [74].
+
+In short, a good zero-shot proxy for deep network accuracy should provide insights into the network capacity to learn complex representations, generalize to unseen samples, and train to converge to minimal loss values. However, as shown in Table 2, most existing proxies tend to target only one of these aspects. This narrow focus results in outcomes that
+
+often fail to outperform some naive proxies, like #Params or #FLOPs; we empirically verify this observation in Section 4.
+
+In this paper, we categorize the existing zero-shot proxies as follows: depending on whether or not the gradients are involved in the proxy calculation, the existing accuracy proxies fall into two major classes: (i) gradient-based accuracy proxy and (ii) gradient-free accuracy proxy (summarized in Table 2). The symbols used in this section and their corresponding meaning are summarized in Table 1.
+
+#### **2.2 Gradient-based accuracy proxies**
+
+We first introduce several similar proxies derived from the gradient over parameters of deep networks.
+
+#### *2.2.1 Gradient norm*
+
+The gradient norm is the sum of norms for each layer's gradient vector [55]. To calculate the gradient norm, we first input a mini-batch of data into the network and then propagate the loss values backward. Next, we calculate the ℓ2-norm of each layer's gradient and then add them up for all the convolution and linear layers of the given network. Formally, the definition of gradient norm G is as follows:
+
+$$G\triangleq\sum_{i=1}^{D}\|\nabla_{\theta_{i}}L\|_{2}\tag{1}$$
+
+where D, θi and L are, the number of layers, the parameter vector of the i-th layer of a given network and L is the loss values, respectively.
+
+#### *2.2.2 SNIP*
+
+The gradient norm only measures the property of the gradient's propagation for a given network. To jointly measure the parameter importance both in forward inference and gradient propagation, SNIP consists of multiplying the value of each parameter and its corresponding gradient [75]. Formally, SNIP is defined as below:
+
+$$\text{SNIP}\triangleq\sum_{i}^{D}|\langle\mathbf{\theta}_{i},\nabla\mathbf{\theta}_{i}L\rangle|\tag{2}$$
+
+where ⟨·, ·⟩ represents the inner product; D, θi and L are, the number of layers, the parameter vector of the i-th layer of a given network and L is the loss values, respectively.
+
+#### *2.2.3 Synflow*
+
+Similar to SNIP, Synflow consists of maintaining the sign of the SNIP proxy [76]:
+
+  
+  
+**Synflow $\triangleq\sum_{i}\langle\mathbf{\theta}_{i},\mathbf{\nabla}\mathbf{\theta}_{i}L\rangle$** (3)
+
+## *2.2.4 GraSP*
+
+The three proxies mentioned above only take the first-order derivatives of neural networks into account. The GraSP proxy considers both the first-order and second-order derivatives of neural networks [77]. Specifically, GraSP is defined by the inner product of the parameters and the product of the Hessian matrix and the gradients:
+
+$$\sum_{i}-\langle\mathbf{H}_{i}\nabla_{\mathbf{\theta}_{i}}L,\mathbf{\theta}_{i}\rangle\tag{4}$$
+
+TABLE 1: The symbols used in this paper and their corresponding meaning.
+
+| Symbol | Meaning | Symbol | Meaning |
+| --- | --- | --- | --- |
+| x | Input samples | yˆ | Ground truth (labels) |
+| f | A given deep network | D | The number of layers of a given network |
+| fe | A network w/o final pooling and FC layers | y | The output of a given model |
+| L | Loss function | L | Loss values |
+| Θ | All parameters of a given network | θi | Parameters vector of the i-th layer |
+| Hi | Hessian matrix of the i-th layer | zi | The output vector of layer i |
+
+TABLE 2: Categorization of zero-shot proxies. Based on whether or not the proxy relies on gradients, there are gradient-based and gradient-free approaches. We also categorize existing proxies by their theoretical underpinning (cf. Section 2.1). An empty cell indicates the proxy is not in that category.
+
+| Proxy | Grad norm | SNIP | Synflow | GraSP | GradSign | Fisher | Jacob cov | NTK Cond | Zen-score | #LR | Logdet | NN-Mass |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Gradient-free |  |  |  |  |  |  |  |  |  | ✓ | ✓ | ✓ |
+| Gradient-based | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |  |
+| Trainability &Convergence | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  | ✓ |
+| Expressive Capacity |  |  |  |  |  | ✓ |  |  | ✓ | ✓ | ✓ | ✓ |
+| Generalization Capacity |  |  |  |  |  |  |  | ✓ |  |  |  |  |
+
+where Hi is Hessian matrix of the i-th layer.
+
+There are multiple theoretical analyses for the above three proxies. Specifically, Synflow and SNIP have been proven to be layer-wise constants in linear networks during the backpropagation process [75], [76]. Moreover, several works show that Synflow and GraSP are different approximations of the first-order Taylor expansions of deep neural networks [77], [78]. We remark that Taylor expansions of a deep network can identify the parameters that contribute the most to the loss values; thus, it can measure the importance of parameters.
+
+#### *2.2.5 GradSign*
+
+Given an input batch with B input samples {x1, x2, ..., xB}, GradSign is defined as follows [79]:
+
+$$\text{GradSign}\triangleq\sum_{\theta_{k}\in\Theta}\left|\sum_{i=1}^{B}\text{sign}[\nabla_{\theta_{k}}\mathcal{L}\left(f(\mathbf{x}_{i}),y_{i}\right)]\right|\tag{5}$$
+
+Essentially, GradSign assesses the uniformity across multiple training samples for each parameter, and then adds them up as the final proxy value. It has been proven that GradSign serves as an approximation of the training loss following the training phase [79]. More specifically, a higher value of Grad-Sign is indicative of a diminished training loss. Consequently, GradSign measures the convergence properties inherent in deep neural networks.
+
+Besides the gradient over parameters, the gradient over each layer's activation is also explored to build the accuracy proxy as shown below.
+
+#### *2.2.6 Fisher information*
+
+Fisher information of a neural network can be approximated by the square of the activation value and their gradients [80], [81]:
+
+$$\begin{array}{l}D\\ \Sigma(\nabla_{\bf z_{i}}L,{\bf z_{i}})^{2}\end{array}\tag{6}$$
+
+where zi is the feature map vector of the i-th layer of a given network.
+
+Previous works show that a second-order approximation of Taylor expansion in a neural network is equivalent to an empirical estimate of the Fisher information [81]. Hence, measuring the Fisher information of each neuron/channel of a given network can reflect the importance of these neurons/channels.
+
+#### *2.2.7 Jacobian covariant*
+
+Besides the gradient over parameters and activations, the Jacobian covariant (Jacob cov) leverages the gradient over the input data x [82], [83]. To calculate the Jacob cov proxy, given an input batch with B input samples {x1, x2, ..., xB}, the gradients matrix J of the output results {y1, y2, ..., yB} w.r.t. these inputs are first computed:
+
+$$\mathbf{J}=\left(\nabla_{\mathbf{x}_{1}}y_{1},\nabla_{\mathbf{x}_{2}}y_{2},...,\nabla_{\mathbf{x}_{B}}y_{B}\right)^{T}\tag{7}$$
+
+Next, the raw covariance matrix is generated as:
+
+$$\mathbf{G}=(\mathbf{J}-\mathbf{M})(\mathbf{J}-\mathbf{M})^{T}\tag{8}$$
+
+where Mi,j = 1 B PB n=1 Ji,n. Then the raw covariance matrix is normalized to get the real covariance matrix Γ:
+
+$$\Gamma_{i,j}=\frac{G_{i,j}}{\sqrt{G_{i,i}G_{j,j}}}\tag{9}$$
+
+where Γi,j denotes the entries of Γ. Let λ1 ≤ λ2 ≤ ... ≤ λB be the B eigenvalues of Γ; then the Jacobian covariant is generated as follows:
+
+$$\text{Jacob\_cov}\triangleq-\sum_{i=1}^{B}\left[\left(\lambda_{i}+\epsilon\right)+\left(\lambda_{i}+\epsilon\right)^{-1}\right]\tag{10}$$
+
+where ϵ is a small value used for numerical stability. As discussed in [82], [83], Jacob cov can reflect the expressivity of deep networks thus higher Jacob cov values indicate better accuracy.
+
+#### *2.2.8 Zen-score*
+
+Zen-score is a new proxy for a given model [84], [85]. The Zen-score is defined as:
+
+$$\log\mathbb{E}_{\mathbf{x},\mathbf{\epsilon}}\left(\left\|f_{e}(\mathbf{n})-f_{e}(\mathbf{n}+\alpha\mathbf{\epsilon})\right\|_{F}\right)+\sum_{k,i}\log\left(\sqrt{\frac{\sum_{j}\sigma_{ij}^{k}}{Ch_{i}}}\right),$$
+ 
+$$\mathbf{x}\sim\mathcal{N}(0,\mathbf{I})\tag{11}$$
+
+where, n is a sampled Gaussian random vector, ϵ is a small input perturbation, ∥·∥F indicates the Frobenius norm, α is a tunable hyper-parameter, Chi is the number of channels of the i-th convolution layer, and σ k ij is the variance of the i-th layer's j-th channels for the k-th samples in an input batch data. As shown in Eq.11, Zen-score measures model expressivity by averaging the Gaussian complexity under randomly sampled x and ϵ. We note that this is equivalent to computing the expected gradient norm of f with respect to input x instead of network parameters. Hence, Zen-score measures the expressivity of neural networks instead of their trainability: networks with a higher Zen-score have a better expressivity and thus tend to have a better accuracy.
+
+#### *2.2.9 NTK Condition Number*
+
+Neural Tangent Kernel is proposed to study the training dynamics of neural networks [86]. More precisely, given two input samples x1 and x2, NTK is defined as:
+
+$$\kappa\left(\mathbf{x}_{1},\mathbf{x}_{2}\right)=\mathbf{J}(\mathbf{x}_{1})\mathbf{J}(\mathbf{x}_{2})\tag{12}$$
+
+where J(x) is the Jacobian matrix evaluated at the sample x [87]. Lee et al. prove that the training dynamics of wide neural networks can be solved as follows [88]:
+
+$$\mu_{t}({\bf X})=\left({\bf I}-e^{-\eta t{\cal K}({\bf X},{\bf X})}\right){\bf y}\tag{13}$$
+
+where t denotes the training step; µt represents the output expectations at training step t; X ∈ R m×d and y ∈ R m are the training input having m samples with d dimensions per sample, and their corresponding labels, respectively; η is the learning rate. K (X, X) ∈ R m×m is the NTK for these input data. By conducting the eigendecomposition of Eq. 13, the i-th dimension in the eigenspace of output expectation can be written as follows:
+
+$$\mu_{t}(\mathbf{X}_{i})=\left(\mathbf{I}-e^{-\eta\lambda_{i}t}\right)\mathbf{y}_{i},i=\{1,2,...,m\}\tag{14}$$
+
+where λ1 ≤ λ2 ≤ ... ≤ λm are the eigenvalues of the NTK K (X, X).
+
+Therefore, a smaller difference between λ1 and λm indicates (on average) a more "balanced" convergence among different dimensions in the eigenspace. To quantify the above observation, the NTK Condition Number (NTK Cond) is defined as follows [54]:
+
+$${\rm NTK\_Cond}\stackrel{{\Delta}}{{=}}\mathbb{E}_{\mathbf{X},\mathbf{\Theta}}\frac{\lambda_{m}}{\lambda_{1}}\tag{15}$$
+
+where Θ is the randomly initialized network parameters. Chen et al. demonstrate that the NTK Cond is negatively correlated with the architecture's test accuracy [54]. Hence, the networks with lower NTK Cond values tend to have a higher test accuracy. Similar insights are reported and leveraged in [89] for NAS of vision transformers (ViTs).
+
+#### **2.3 Gradient-free accuracy proxy**
+
+Though the gradient-based proxies do not require the training process on the entire dataset, backward propagation is still necessary to compute the gradient. To entirely remove the gradient computation from the neural architecture search, several gradient-free proxies have been proposed lately.
+
+#### *2.3.1 Number of linear regions*
+
+The number of linear regions in a neural network indicates the distinct sections into which the network can partition its input space; thus, it describes the expressivity of a given network [90], [91], [92], [93]. For instance, a single-neuron perceptron with a ReLU activation function can divide its input space into two regions. Previous work shows that one can estimate the number of linear regions with the help of the activation patterns in the output activation matrix R [92]:
+
+$$\mathbf{R}=\mathbf{1}\cdot\mathbf{1}^{T}-\text{sign}[\mathbf{z}_{i}(\mathbf{1}-\mathbf{z}_{i})^{T}+(\mathbf{1}-\mathbf{z}_{i})\mathbf{z}_{i}^{T}]\tag{16}$$
+
+where 1 is an all-one vector. Next, by removing the repeating patterns and assigning the weights to each pattern, the number of linear regions ρ is as follows:
+
+$$\rho\triangleq\sum_{j}\frac{1}{\sum_{k}R_{j,k}}\qquad\qquad(17)$$
+
+where Rj,k is the entry of R. Therefore, the number of linear regions measures how many unique regions the network can divide the entire activation space into (see Figure 4).
+
+![](_page_4_Figure_28.jpeg)
+
+Fig. 4: The illustration of Logdet proxy; Ai , Bi , i = {1, 2, 3} are the neurons of a multi-layer perceptron. First, the input space is divided into several linear regions. Next, each region is encoded by a binary code; then Eq. 18 is applied to compute the Logdet proxy. (Adapted from [83])
+
+#### *2.3.2 Logdet*
+
+Logdet is another proxy proposed based on the number of linear regions [83]:
+
+$$\mathbf{H}=\begin{bmatrix}N_{LR}-d_{H}(\mathbf{c}_{1},\mathbf{c}_{1})&\cdots&N_{LR}-d_{H}(\mathbf{c}_{1},\mathbf{c}_{N})\\ \vdots&&\vdots\\ N_{LR}-d_{H}(\mathbf{c}_{N},\mathbf{c}_{1})&\cdots&N_{LR}-d_{H}(\mathbf{c}_{N},\mathbf{c}_{N})\end{bmatrix}\tag{18}$$
+
+where NLR is the total number of linear regions, dH is the Hamming distance, and ci is the binary coding vector of the i-th linear region as shown in Figure 4. Previous work shows that networks with a higher Logdet at initialization tend to have higher test accuracy after training [83].
+
+#### *2.3.3 Topology inspired proxies*
+
+The very first pioneering work behind theoreticallygrounded, training-free architecture design was done by Bhardwaj et al. [53]. While the above proxies are proposed for a general search space, *i.e.,* without any constraints on the candidate architectures, as discussed later, these generalpurpose proxies are not better than some naive proxies, *e.g.,* the number of parameters (#Params) of a model. To design better accuracy proxies than #Params, Bhardwaj et al. [53] constrained the search space to specific topologies, e.g., DenseNets, ResNets, MobileNets, etc., and theoretically studied how network topology influences gradient propagation. Inspired by the network science, NN-Mass is defined as follows [53]:
+
+$$\rho_{c}\triangleq\frac{\#\text{Actual skip connections of cell}c}{\#\text{Total possible skip connections of cell}c}\tag{19}$$
+ 
+$$\text{NN-Mass}\triangleq\sum_{\text{each cell}c}\rho_{c}w_{c}d_{c}$$
+
+where wc and dc are the width and depth values of a cell1 , respectively. Bhardwaj et al. prove that higher NN-Mass values indicate better trainability of networks and faster convergence rate during training [90]. Moreover, they also show that networks with higher NN-Mass values tend to achieve a higher accuracy. NN-Mass has also been used to perform training-free model scaling to significantly improve accuracy-MACs tradeoffs compared to highly accurate models like ConvNexts [94]. In [94], Bhardwaj et al. show the connection between NN-Mass and expressive power of deep networks for ResNet-type networks.
+
+As an extension of NN-Mass, NN-Degree is proposed by relaxing the constraints on the width of networks. Formally, NN-Degree is defined as follows [95]:
+
+NN-Degree $=\sum_{\text{each cell}c}\left(w_{c}+\frac{\#\text{Actual skip connections}}{\#\text{Total input channels}}\right)$
+
+where wc is the average width value of a cell c. Similarly to NN-Mass, NN-Degree has shown a high positive correlation with the test accuracy.
+
+Lately, Chen et al. developed another principled approach for understanding of a neural network connectivity patterns based on its capacity or trainability [96]. Specifically, they theoretically characterized the impact of connectivity patterns on the convergence of deep networks under gradient descent training with fine granularity, by assuming a wide network and analyzing its Neural Network Gaussian Process (NNGP) [97]. Chen et al. also prove that how the spectrum of an NNGP kernel propagates through a particular connectivity pattern would affect the bounds of the convergence rates. On the practical side, they show that such NNGP-based characterization could act as a simple filtration of "unpromising" connectivity patterns, to significantly accelerate the largescale neural architecture search without any overhead.
+
+#### **2.4 Summary**
+
+As shown in Table 2, most of the existing zero-shot proxies are gradient-based. We note that to calculate the gradient typically involves the backward propagation. Hence, gradientbased proxies are less efficient than gradient-free proxies. Besides, most of the gradient-based proxies (except for Fisher and Logdet), are designed to measure the trainability of deep networks. In contrast, most of the gradient-free proxies (except for NN-Mass) are indicatives of the expressive capacity of neural networks. Moreover, apart from NTK Cond, current proxies fail to quantify the generalization capacity of deep networks. Future proxy designs should address and rectify this limitation.
+
+More importantly, as highlighted earlier, the majority of existing zero-shot proxies (with the exceptions of NTK Cond and NN-Mass) concentrate solely on one of three dimensions: {expressive capacity, generalization capacity, trainability}. This is a fundamental shortcoming, as a good neural network seamlessly integrates all three facets. We provide empirical evidence of this concern in Section 4.
+
+## **3 BENCHMARKS AND PROFILING MODELS**
+
+NAS benchmarks have been proposed to provide a standard test kit for fair evaluation and comparisons of various NAS approaches [98], [99], [100], [101]. A NAS benchmark defines a set of candidate architectures and their test accuracy or hardware costs. We classify the existing NAS benchmarks as standard NAS (*i.e.,* without hardware costs) and hardwareaware NAS benchmarks. Next, we introduce these two types of NAS benchmarks.
+
+#### **3.1 NAS Benchmarks**
+
+We evaluate the zero-shot proxies on the following standard NAS benchmarks: **NASBench-101** provides 423k neural architectures and their test accuracy on the CIFAR10 dataset, where each architecture is built by stacking a cell for multiple times [102]. **NATS-Bench** contains two sub-search spaces: *(i) NATS-Bench-TSS*, also known as NASBench-201; each network in NASBench-201 is also built by repeating a cell multiple times on three datasets, namely, CIFAR10, CIFAR100, and ImageNet16-120 [103] (see Figure 5 for more details); *(ii) NATS-Bench-SSS* contains 32768 architectures with different width values for each layer [104]2 . **TransNAS-Bench-101** is
+
+<sup>1.</sup> A cell represents a group of layers with the same width values or commonly used blocks in CNN, *e.g.,* Basic/Bottleneck blocks in ResNet, and Inverted bottleneck blocks in MobileNet-v2.
+
+<sup>2.</sup> In the rest of the paper, we use the NATS-Bench to represents NATS-Bench-SSS for short.
+
+![](_page_6_Figure_1.jpeg)
+
+Fig. 5: Search space of NASBench-201. Each architecture in the search space is built by stacking a cell multiple times; each cell can have six operations (edges in the figure) and each operation has 5 potential different options (drawn with different colors). NASBench-101 has a very similar search space with more candidate operations. (Adapted from [11])
+
+a benchmark dataset containing network performance on seven diverse vision tasks, including image classification, image reconstruction, and pixel-level prediction [105] with two different sub-search spaces: (*i*) A cell-level search space consisting of 4,096 unique networks with different cells; (*ii*) A macro-level search space containing 3256 unique networks with different depth values.
+
+**Hardware-aware NAS benchmarks.** Recent hardware-aware NAS approaches aim to jointly optimize the test performance and hardware efficiency of neural architectures. Hence, hardware-aware NAS benchmarks have been proposed by incorporating the hardware costs of networks into the search process. HW-NAS-Bench covers the search space from both the NASBench-201 and FBNet [106]. It provides all the architectures in these two search spaces measured/estimated hardware cost (*i.e.,* latency and energy consumption) on multiple types of devices. Similarly, Eagle, also known as BRP-NAS, provides a benchmark that contains latency and energy for NAS-Bench-201 networks running on up to 13 devices spanning a wide spectrum from the cloud server to the edge devices; this ameliorates the need for researchers to have access to these devices [107]. Moreover, Eagle also proposes an efficient performance estimator for measuring and predicting the performance of neural networks (cf. Section 3.2).
+
+#### **3.2 Hardware Performance Models**
+
+To incorporate the hardware-awareness into NAS, we also need to construct models to efficiently and accurately estimate the hardware performance (*e.g.,* latency) of given networks. In this section, we consider latency to characterize the hardware performance and use NASBench-201 as an example to compare several representative approaches for hardware performance models.
+
+BRP-NAS is a pioneering approach that uses deep learning to build hardware performance models [107]. Specifically, BRP-NAS first converts a neural network into a directed acyclic graph by modeling each layer as an edge in a graph and modeling the input/output as nodes in the graph. Next, by using different values to present different types of layers, BRP-NAS uses a Graph Convolution Network (GCN) to build the hardware performance models. Then the model is trained with multiple networks and their real hardware
+
+TABLE 3: Comparison of representative hardware performance models. Granularity refers to the level of input features for the hardware performance models, and transferability denotes the efficiency with which the model for one hardware platform can be transferred to another. The latency is measured on Snapdragon-888's GPU with NASBench-201 on CIFAR100 dataset.
+
+| Approach | Method | Granularity | Transferability | RMSE(ms) |
+| --- | --- | --- | --- | --- |
+| BRP-NAS [107] | GCN or MLP | Layer | Low | 4.6 |
+| HELP [108] | GCN or MLP | Layer | High | 0.12 |
+| NN-Meter [109] | GCN | Kernel | Low | 1.2 |
+
+performance data on the target hardware. In particular, for the networks with fixed depth, BRP-NAS can also use MLP to build the performance model. Though BRP-NAS can achieve good prediction results with enough training samples, there is a limitation for BRP-NAS: the performance model is trained for a specific hardware platform; if new hardware comes, one needs to repeat the entire process.
+
+To address the above problem, HELP builds the hardware performance models by taking the hardware information as extra input features (*e.g.,* type of the hardware, number of computing elements, and the size of on-chip memory) [108]. Next, HELP is trained with the latency data collected from multiple platforms, such as desktop CPU/GPU and mobile CPU/GPU. This way, if new hardware comes in, HELP only needs a few samples to conduct the fine-tuning process (typically around 10). Hence, HELP is very efficient in terms of the transferability to new hardware. Nevertheless, both BRP-NAS and HELP are built on the layer-level analysis, which is relatively coarse for an accurate prediction.
+
+To further improve the accuracy of performance models, NN-Meter is proposed by analyzing the neural network at a finer granularity during run-time. Specifically, NN-Meter computes the kernels of each neural network, which are originally generated during the compilation process [109]. To remove the necessity of the compilation process, NN-Meter utilizes the algorithm to automatically predict the generated kernels. Hence, as shown in Table 3, NN-Meter has a much higher prediction quality than both HELP and BRP-NAS.
+
+![](_page_7_Figure_1.jpeg)
+
+Fig. 6: The correlation between various proxies and the test accuracy on NASBench-201 search space for CIFAR-100 dataset (averaged over 5 seeds). All: all the networks in the benchmark; Top 5%: the architectures with test accuracy ranking top 5% in the entire search space. KT and SPR are short for Kendall's τ and Spearman's ρ, respectively (same for other figures).
+
+## **4 EXPERIMENTAL RESULTS**
+
+In this section, we compare the existing proxies on multiple NAS benchmarks under various scenarios. Besides the proxies mentioned above, we also evaluate two naive proxies, *i.e.,* #Params and #FLOPs.
+
+**Evaluation Metrics.** We use two commonly used criteria to evaluate the correlations between different zero-shot proxies and their test accuracies across different benchmarks:
+
+- Spearman's ρ. Spearman's ρ quantifies the monotonic relationships between two variables within the range of [-1, 1], where ρ = 1 indicates a perfect positive correlation between these two variables, while ρ = −1 indicates a perfect negative correlation. We use "SPR" for short to represent Spearman's ρ in the tables and figures of this paper.
+- Kendall's τ . Similar to Spearman's ρ, Kendall's τ value is also within [-1, 1]. Typically, Kendall's τ is more robust to error and discrepancies than Spearman's ρ. We use "KT" for short to represent Kendall's τ in the tables and figures of this paper.
+
+In NAS, the architectures with good performance are more important than those with poor performance. Hence, we also calculate Spearman's ρ and Kendall's τ for the architectures with test accuracy ranking top 5% in the entire search space, which are denoted as "SPR@Top 5%" and "KT@Top 5%", respectively. Similarly, if we calculate Spearman's ρ and Kendall's τ for all architectures in the search space, they are denoted as "SPR@All" and "KT@All", respectively.
+
+#### **4.1 NAS without hardware-awareness**
+
+To compare the performance of these proposed accuracy proxies, we calculate the correlation of these proxy values and the real test accuracy. We next discuss the results on two NAS benchmarks: NASBench-201 and NATS-Bench.
+
+![](_page_7_Figure_11.jpeg)
+
+Fig. 7: The correlation between various proxies and the test accuracy on NASBench-201 search space for ImageNet16-120 dataset (averaged over 5 seeds).
+
+![](_page_7_Figure_13.jpeg)
+
+Fig. 8: The correlation between various proxies and the test accuracy on NATS-Bench search space for CIFAR100 dataset (averaged over 5 seeds).
+
+![](_page_7_Figure_15.jpeg)
+
+Fig. 9: The correlation between various proxies and the test accuracy on NATS-Bench search space for ImageNet16-120 dataset (averaged over 5 seeds).
+
+TABLE 4: The test accuracy (%) of optimal architectures obtained by various zero-shot proxies (averaged over 5 runs) on NASBench-201 (NB201) and NATS-Bench (NB201) for CIFAR100 (C100) and ImageNet16-120 (Img16) datasets. The best results are shown with bold fonts.
+
+|  | Proxies | Ground Truth | Grad norm | SNIP | GraSP | GradSign | Fisher | Jacob cov | Synflow | Zen-score | #Params | #FLOPs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| NB201 | C100 | 73.51 | 60.02 | 60.02 | 60.02 | 60.02 | 60.02 | 68.89 | 62.22 | 68.10 | 71.11 | 71.11 |
+|  | Img16 | 47.31 | 29.27 | 29.27 | 5.46 | 5.46 | 29.27 | 25.07 | 26.08 | 40.77 | 41.44 | 41.44 |
+| NATS | C100 | 70.92 | 48.44 | 68.36 | 57.40 | 57.40 | 53.14 | 55.04 | 66.84 | 69.92 | 70.28 | 70.28 |
+|  | Img16 | 46.73 | 40.97 | 45.63 | 33.97 | 33.97 | 35.80 | 35.03 | 35.37 | 46.27 | 44.73 | 44.73 |
+
+#### *4.1.1 Unconstrained search space*
+
+We first investigate the performance of zero-shot proxies for the unconstrained search spaces, *i.e.,* considering all networks in the benchmarks.
+
+*NASBench-201*: We calculate the correlation coefficients between multiple proxies and the test accuracy on CIFAR-100 and ImageNet16-120 datasets. As shown in Figure 6 and 7, the #Params generally works best for these two datasets. Except for the #Params, several gradient-based proxies, such as Grad norm, SNIP, GraSP, and Fisher, also work well.
+
+As shown in Table 4, we compare the neural architectures with the highest test accuracy found via various proxies. The neural architectures obtained via #Params and #FLOPs have the highest test accuracy on NASBench-201, which is natural and expected results given the correlation scores above.
+
+*NATS-Bench*: Similar to NASBench-201, we calculate the correlation coefficients between these proxies and the test accuracy on CIFAR-100 and ImageNet16-120 datasets for NATS-Bench. As shown in Figure 8 and 9, the #Params and Zen-score generally work best for these two datasets.
+
+*TransNAS-Bench-101*: So far, we primarily compare these zero-shot proxies on the classification tasks. To verify the effectiveness of these proxies for more diverse applications, we make comparisons for non-classification tasks selected from the TransNAS-Bench-101. We pick the largest search space TransNAS-Bench-101-Micro which contains 4096 total architectures with different cell structures. We compare these proxies under the following three non-classification tasks:
+
+- Semantic segmentation. Semantic segmentation involves classifying each pixel in an image into a predefined category or class. Unlike object detection, which identifies the bounding boxes around objects, or image classification, which assigns a single label to the entire image, semantic segmentation provides a detailed, pixel-level classification.
+- Surface Normal. Similar to semantic segmentation, surface normal is a pixel-level prediction task that predicts surface normal statistics.
+- Autoencoding. Autoencoding is an end-to-end image reconstruction task that encodes an input image into a low-dimension representation vector and then reconstructs this vector into the input image.
+
+As shown in Figure 10, Jacob cov typically achieves the highest correlation for these two tasks and consistently outperforms #Params. Besides Jacob cov, the Zen-score also works well and it consistently surpasses #Params.
+
+We also compare the neural architectures with the highest test accuracy found via various proxies. As shown in Table 5, the neural architectures obtained via #Params and #FLOPs consistently have the highest or second-highest test performance on TransNAS-Bench-101.
+
+Overall, it appears that none of these proposed accuracy proxies consistently have a higher correlation with the test accuracy compared to #Params and #FLOPs for these two NAS benchmarks.
+
+#### *4.1.2 Constrained search space*
+
+We note that the architectures with high accuracy are much more important than those networks with low test accuracy. Hence, we calculate the correlation coefficient for the architectures with test accuracy ranking top 5% in the entire search space. Figure 6 and 7 show that, compared to ranking without constraints (*i.e.,* considering all architectures), the correlation score has a significant drop except for the Zen-score on NASBench-201. Similarly, on NATS-Bench, Figure 8 and 9 show that most of the proxies have a significant correlation score drop when constrained to the top 5% networks in the search space, including #Params and #FLOPs. By switching to non-classification tasks, we observe a similar trend in Figure 10, i.e., there's a significant correlation score drop under these constrained scenarios.
+
+This drop in correlation score for the top 5% of networks means the zero-shot NAS is more likely to miss the optimal or near-optimal networks. Table 4 shows that there is a big accuracy gap between the ground truth and the networks obtained by each proxy. results become even worse with a search that has more relaxed hardware constraints (see Sec 4.4).
+
+As shown in previous literature, #Params and #FLOPs outperform other proxies in multiple benchmarks [63]. Hence, we dig deep into the effectiveness of #Params and #FLOPs by gradually making the search space more constrained. As shown in Figure 13 and Figure 14, if we compute the correlation for networks with higher accuracy, both #Params and #FLOPs have a significant drop in correlation score.
+
+Given the above results, we conclude that all of the existing proxies (including #Params and #FLOPs) do *not* correlate well for the network with high accuracy. This is a fundamental drawback because what matters most for NAS are precisely these networks with high accuracy. Hence, there is great potential for designing better proxies that could yield high correlation scores for these top networks.
+
+#### *4.1.3 Specific Network Families*
+
+We remark that many popular neural architectures are not included in most NAS benchmarks. Hence, in this section, we consider several commonly used network families as the search space since they are widely used in various applications. As shown in Figure 11, if we search within
+
+TABLE 5: The test performance of optimal architectures obtained by various zero-shot proxies (averaged over 5 runs) on TransNAS-Bench-101 benchmarks. The best results are shown with bold fonts. Here, the evaluation metric for semantic segmentation is mIoU, while the rest two use SSIM [110].
+
+| Task | GroundTruth | Gradnorm | SNIP | GraSP | GradSign | Fisher | Jacob cov | Synflow | Zen-score | #Params | #FLOPs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Semantic Segmentation | 94.61 | 91.66 | 94.43 | 94.53 | 90.19 | 91.89 | 94.34 | 94.46 | 94.50 | 94.50 | 94.50 |
+| Surface Normal | 0.59 | 0.53 | 0.53 | 0.38 | 0.57 | 0.57 | 0.55 | 0.53 | 0.55 | 0.55 | 0.55 |
+| Autoencoding | 0.58 | 0.36 | 0.33 | 0.33 | 0.35 | 0.49 | 0.42 | 0.46 | 0.46 | 0.46 | 0.46 |
+
+TABLE 6: Comparison of zero-shot proxies based NAS vs. one-shot NAS on ProxylessNAS search space. The results are averaged over three runs.
+
+| Method | One-shot NAS | Grad norm | Synflow | GradSign | Jacob cov | NTK Cond | Zen-score | Params | FLOPs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Top-1 on ImageNet-1K | 74.39 | 71.46 | 70.02 | 73.17 | 70.31 | 73.63 | 71.78 | 72.87 | 73.08 |
+| mAP on COCO | 0.28 | 0.22 | 0.21 | 0.23 | 0.24 | 0.27 | 0.25 | 0.26 | 0.28 |
+| Search cost (GPU Hours) | 200 | 8.9 | 8.8 | 9.7 | 9.2 | 37 | 1.6 | 0.03 | 1.5 |
+
+networks from ResNet and Wide-ResNet families, then SNIP, Zen-score, #Params, #FLOPs, and NN-Mass have a significantly high correlation with the test accuracy (*i.e.,* Spearman's ρ > 0.9).
+
+As shown in Figure 12, Grad norm, SNIP, Fisher, Synflow, Zen-score, and NN-Mass work best for the MobileNet-v2 network family, which is slightly better than the two naive proxies #Params and #FLOPs. These results show that there is great potential in designing good proxies for a constrained yet widely used search space.
+
+### **4.2 Large-scale Dataset**
+
+To further compare these proxies in more complicated scenarios, we illustrate the performance for ImageNet-1K classification, COCO object detection, and ADE20K semantic segmentation tasks.
+
+**ImageNet-1K classification.** We first compute the zero-shot proxies for the CNN architectures in the model space of TIMM [111]. Notably, we only consider networks that are trained standalone on ImageNet-1K without pre-training or distillation. In total, we evaluate 200 CNNs and report the correlation between Top-1 accuracy and multiple proxies in Figure 15. As shown, #Params and #FLOPs still have a higher correlation than these zero-shot proxies. This is consistent with our observations on NAS benchmarks.
+
+We also compare the performance of these proxy-based NAS with one-shot NAS within the same search space. We conduct the comparison on the MobileNet-V2 based search space under the same #FLOPs budget of 600M. Specifically, for proxy-based NAS, we use the evolutionary algorithm to search for the architecture with the highest proxy values; we conduct the search for at most 10K steps. For the oneshot NAS, we use the same algorithm from [36]. We train the obtained architecture for 150 epochs under the standard data augmentation configurations. We use the SGD optimizer with an initial learning rate of 0.1 and a cosine annealing learning rate schedule.
+
+As shown in Table 6, compared to one-shot NAS, zeroshot proxy-based NAS has a slight accuracy degradation (less than 1%), but requires orders of magnitude less search costs. Moreover, when comparing these zero-shot proxies, NTK Cond based search performs closest to one-shot NAS, but at a higher search cost than other proxies. These results highlight an intrinsic trade-off between search cost and the accuracy of the obtained architectures.
+
+**COCO object detection.** Following the standard practice in NAS, we employ the architectures obtained on ImageNet-1K (shown in Table 6) as the backbone for detection models. By using the detection head from NanoDet [112], we then train these networks for 50 epochs on COCO following the same training setup as NanoDet. As shown in Table 6, the results follow a trend similar to that of ImageNet-1K. More precisely, #FLOPs and NTK Cond based zero-shot NAS yield performance that is the same or very close to the one-shot NAS.
+
+**ADE20K semantic segmentation.** We compute these zeroshot proxies for the CNN architecture in the model space of PyTorch Segmentation [111]. We vary both the backbone and segmentation heads to obtain multiple segmentation networks; we then train these models from scratch and get their test performance. In total, we evaluate 200 CNNs and report the correlation between pixel accuracy (or mIoU) and various proxies in Figure 16. As shown, #Params and #FLOPs have a higher correlation than the other zero-shot proxies.
+
+To conclude, these comprehensive evaluations on these large-scale datasets reaffirm the dominance of #Params and #FLOPs over other proxies in multiple scenarios. Therefore, future works should make comprehensive comparisons under various tasks and datasets to show a consistent advantage over #Params and #FLOPs. Besides, while zeroshot proxy-based NAS exhibits certain efficiencies, there remains a trade-off between search cost and test performance accuracy.
+
+#### **4.3 Vision Transformers**
+
+Until now, our evaluations have primarily focused on CNNs; however, with the recent surge in their performance and popularity, vision transformers (ViTs) are becoming increasingly important in the realm of computer vision [5]. Therefore, in this section, we evaluate these proxies using the ViT model space for ImageNet-1K.
+
+![](_page_10_Figure_1.jpeg)
+
+Fig. 10: The correlation between various proxies and test performance on TransNAS-Bench-101 for Semantic Segmentation, Autoencoding, and Surface Normal tasks (averaged over 5 seeds).
+
+![](_page_10_Figure_3.jpeg)
+
+Fig. 11: The correlation between various proxies and the test accuracy on a set of ResNets and Wide-ResNets for ImageNet-1K classification (averaged over 5 seeds).
+
+![](_page_10_Figure_5.jpeg)
+
+Fig. 12: The correlation between various proxies and the test accuracy on a set of MobileNet-v2-based networks for ImageNet-1K classification (averaged over 5 seeds).
+
+Specifically, we compare these zero-shot proxies for the ViTs in the model space of TIMM [111]. Notably, we only include networks that are trained standalone on ImageNet-1K without pre-training or distillation. In total, we evaluate 100 ViTs and report the correlation between Top-1 accuracy and various proxies in Figure 17. The results show that #Params and #FLOPs has higher correlation score with the test accuracy than the zero-shot proxies. This is consistent with our observations on CNNs. In conclusion, whether analyzing CNNs or ViTs, the superior correlation of #Params and #FLOPs over zero-shot proxies is consistent.
+
+In practical applications, test performance is not the only design consideration. Indeed, the models obtained by NAS should meet some hardware constraints, especially for deployment on edge devices. Hence, we next explore the performance of these proxies for the hardware-aware search scenarios.
+
+#### **4.4 Hardware-aware NAS**
+
+In this part, we conduct the hardware-aware NAS using the zero-shot proxies introduced above. Specifically, we use these
+
+![](_page_11_Figure_1.jpeg)
+
+Fig. 13: The correlation between #Params & #FLOPs and the test accuracy under various ratios of networks on NASBench-201 for CIFAR100 dataset (averaged over 5 seeds). 20% means computing the correlation scores only for the networks whose test accuracy ranks top 20% in the benchmark; 100% means considering all the networks in the benchmark (same for Figure 14). From left to right, the search space is more and more constrained to neural architectures with high accuracy.
+
+![](_page_11_Figure_3.jpeg)
+
+Fig. 14: The correlation between #Params & #FLOPs and the test accuracy under various ratios of networks on NATS-Bench for ImageNet16-120 dataset (averaged over 5 seeds).
+
+zero-shot proxies instead of the real test accuracy to search for the Pareto-optimal networks under various constraints. We next introduce the results on NASBench-201 (with HW-NAS-Bench) and NATS-Bench.
+
+#### *4.4.1 NASBench-201 / HW-NAS-Bench*
+
+We use EdgeGPU (NVIDIA Jetson TX2) as the target hardware and use the energy consumption data from HW-NAS-Bench; then we set various energy consumption values as the hardware constraints. Next, we use different accuracy proxies to traverse all candidate architectures in the search space and obtain the Pareto-optimal networks under various energy constraints.
+
+To illustrate the quality of these networks, we plot these networks and the ground truth results obtained via actual accuracy in Figure 18. As shown, when the energy constraint
+
+![](_page_11_Figure_9.jpeg)
+
+Fig. 15: The correlation between various proxies and the test accuracy on the CNNs model space for ImageNet-1K classification.
+
+![](_page_11_Figure_11.jpeg)
+
+Fig. 16: The correlation between various proxies and pixel accuracy (or mIoU) on ADE20K semantic segmentation.
+
+![](_page_12_Figure_1.jpeg)
+
+Fig. 17: The correlation between various proxies and the test accuracy on the ViT model space for ImageNet-1K classification.
+
+is tight (*e.g.,* less than 10mJ), most of the proxies could find networks very close to the real Pareto-optimal, except the Jacob cov. However, when the energy constraint is more relaxed (*e.g.,* more than 20mJ), only #Params, #FLOPs, and Jacob cov can find several networks close to the ground truth.
+
+#### *4.4.2 NATS-Bench*
+
+We measure the latency data on NVIDIA GTX-1080 for NATS-Bench. We then use different accuracy proxies to traverse all candidate architectures to obtain the Paretooptimal networks under various latency constraints. As shown in Figure 19, we plot these networks and the ground truth results. When we set the latency constraint to around 50ms, only #Params, SNIP, and Zen-score can still find the networks that nearly match the real Pareto-optimal networks.
+
+The results on these two benchmarks further verify that current proxies don't correlate well for networks with high accuracy because the real Pareto-optimal networks have higher accuracy when the hardware constraints are more relaxed. This observation suggests a great potential to design better proxies in this scenario.
+
+#### **4.5 Discussion and future work**
+
+#### *4.5.1 NAS Benchmarks*
+
+*Diversity of search space:* We remark that the search space of most existing NAS benchmarks only contains cell-based neural architectures. To further improve the generality of NAS benchmarks, the community may need to incorporate new architectures from more diverse search spaces. For instance, the NATS-Bench has added architectures with different cells for different stages of the search space. Moreover, the cells in these existing benchmarks are similar to the DARTS cell structure. However, in practice, the inverted bottleneck blocks from MobileNet-v2 are more widely used for higher hardware efficiency. Therefore, the next direction of NAS benchmarks may need to cover a more practical and widely used search space, such as FBNet-v3.
+
+*Awareness of hardware efficiency:* So far, only HW-NAS-Bench provides multiple hardware constraints on several types of hardware platforms, but it does not have the accuracy data for most of the networks in the benchmark. Thus, we recommend future NAS benchmarks to incorporate both accuracy and hardware metrics for typical hardware platforms.
+
+### *4.5.2 Zero-shot proxies*
+
+*Why #Params works:* As shown in Section 4.1.1, #Params achieves a higher correlation than other proxies with multiple datasets and multiple benchmarks for unconstrained search space. One may wonder why such a trivial proxy works so well. In general, a good neural architecture should satisfy the following properties: good convergence/trainability and high expressive capacity. We provide the following observations:
+
+- **Expressive Capacity** It is well known that a network with infinite width or depth, can express any type of complex functions with an arbitrarily small errors [113], [114], [115]. Moreover, previous works show that, with the depth or width values increasing, the error w.r.t. ground truth functions will gradually decrease. In other words, more parameters capture the higher expressive capacity of a given neural network [68].
+- **Generalization Capacity** Previous work reveals that a network with more parameters tends to have higher test accuracy under an appropriate training setup [116].
+- **Trainability** On the one hand, given similar depth, the wider networks have better trainability and higher convergence rates, and clearly more parameters [53]. On the other hand, most of the networks evaluated on popular benchmarks share a similar depth value. Hence, within these benchmarks, more parameters will also indicate a better trainability.
+
+Hence, #Params captures both the expressivity and trainability of the networks in these benchmarks. In contrast, most of the proposed proxies usually emphasize either the expressivity or the trainability of networks (but not both). That may be why #Params outperforms these proposed proxies. Hence, future work should aim to design a proxy that could indicate both the convergence/trainability and expressive and generalization capacity of a given network. For instance, recently proposed proxy ZiCo indicates both trainability and generalization capacity of neural networks thus consistently outperforming #Params in multiple NAS benchmarks [117].
+
+*When #Params fails:* (*i*) As shown in this section, when accounting for the architectures with test accuracy ranking top 5%, several proxies outperform both #Params and #FLOPs for some benchmarks. Furthermore, these top-performing network architectures are most important since NAS focuses on obtaining the networks with high accuracy. (*ii*) Many proxies work well in the constrained search space, such as the MobileNet and ResNet families. These networks are widely used in many applications (*e.g.,* MobileNet-v2 for EdgeAI). Clearly, the above two failing cases are very important to push zero-shot NAS to more practical scenarios. Hence, there is a great potential to explore better zero-shot proxies in the above cases.
+
+![](_page_13_Figure_1.jpeg)
+
+Fig. 18: Pareto-optimal networks obtained via various proxies for CIFAR100 dataset on NASBench-201, and for various energy consumption constraints on an EdgeGPU (NVIDIA Jetson TX2). The gray points in these figures are candidate networks in the search space.
+
+*Search method:* Though #Params outperforms most proxies in several scenarios in terms of correlation coefficients, there are alternative search methods to use these zero-shot proxies. For example, as demonstrated in [54], to better leverage these proxies, one potential search method can merge all candidate networks into a supernet and then apply these proxies to prune the network at the initialization stage until hardware constraints are met. This way, the time efficiency of zero-shot NAS approaches can be further improved since the search space is gradually compressed with pruning going on.
+
+*Theoretical support:* We remark that most gradient-based proxies are first proposed to estimate the importance of each parameter or neuron/channel of a given network, thus originally applied to the model pruning problem space instead of ranking networks. Hence, the effectiveness of these gradient-based proxies for zero-shot NAS needs a more profound understanding from a theoretical perspective. Moreover, though most gradient-free proxies are usually presented with some theoretical analysis for NAS, as shown in Section 4.1 and Section 4.4, they generally have a lower
+
+correlation with the gradient-based ones. The theoretical understanding of why these zero-shot proxies can or cannot estimate the test accuracy of different networks is still an open question.
+
+*Customized proxy for different types of networks:* As mentioned in Section 4.1.3, several zero-shot proxies do not work well for a general search space, but do show a great correlation with the test accuracy and beat the #Params on constrained search spaces. In fact, Section 4.1 and Section 4.4 show that designing a zero-shot proxy that generally works well is extremely difficult. One potential direction for the design of zero-shot proxies may lie in partitioning the entire search space into several sub-spaces and then proposing customized proxies specifically designed for different sub-spaces.
+
+## **5 CONCLUSION**
+
+In this paper, we have presented a comprehensive review of existing zero-shot NAS approaches. To this end, we have first introduced accuracy proxies for zero-shot NAS by providing theoretical inspirations behind these proxies,
+
+![](_page_14_Figure_1.jpeg)
+
+Fig. 19: Pareto-optimal networks obtained via various proxies for ImageNet16-120 dataset on NATS-Bench, and for various latency constraints on NVIDIA GTX1080. The gray points in these figures are candidate networks in the search space.
+
+and several commonly used NAS benchmarks. We then have introduced several popular approaches for hardware performance predictions. We have also compared the existing proxies against two naive proxies, namely, #Params and #FLOPs. By calculating the correlation between these proxies and the real test accuracy, we have shown that the proposed proxies to date are not necessarily better than #Params and #FLOPs for these tasks for unconstrained search spaces (*i.e.,* considering all architectures in benchmarks). However, for constrained search spaces (*i.e.,* when considering only networks with high accuracy), we have revealed that the existing proxies, including #Params and #FLOPs, has much worse correlation scores with the real accuracy than unconstrained scenarios. Based on these analyses, we have explained why #Params work and when #Params fail. Finally, we have pointed out several potential research directions to design better benchmarks for better zero-shot NAS and multiple ideas that may enable the design of better zero-shot NAS approaches.

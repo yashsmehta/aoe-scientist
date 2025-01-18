@@ -1,0 +1,315 @@
+# A REVIEW OF NEUROSCIENCE-INSPIRED MACHINE LEARNING
+
+Alexander Ororbia Rochester Institute of Technology Rochester, NY 14623, USA ago@cs.rit.edu
+
+Ankur Mali University of South Florida Tampa, FL 33620, USA ankurarjunmali@usf.edu
+
+Adam Kohan University of Massachusetts Amherst Amherst, MA, USA akohan@umass.edu
+
+Beren Millidge Zyphra, Palo Alto, CA University of Oxford, Oxford, UK beren@millidge.name
+
+Tommaso Salvatori VERSES AI Research Lab, Los Angeles, USA TU Wien, Vienna, Austria tommaso.salvatori@verses.ai
+
+# ABSTRACT
+
+One major criticism of deep learning centers around the biological implausibility of the *credit assignment* schema used for learning – backpropagation of errors. This implausibility translates into practical limitations, spanning scientific fields, including incompatibility with hardware and non-differentiable implementations, thus leading to expensive energy requirements. In contrast, biologically plausible credit assignment is compatible with practically any learning condition and is energy-efficient. As a result, it accommodates hardware and scientific modeling, e.g. learning with physical systems and non-differentiable behavior. Furthermore, it can lead to the development of real-time, adaptive neuromorphic processing systems. In addressing this problem, an interdisciplinary branch of artificial intelligence research that lies at the intersection of neuroscience, cognitive science, and machine learning has emerged. In this paper, we survey several vital algorithms that model bio-plausible rules of credit assignment in artificial neural networks, discussing the solutions they provide for different scientific fields as well as their advantages on CPUs, GPUs, and novel implementations of neuromorphic hardware. We conclude by discussing the future challenges that will need to be addressed in order to make such algorithms more useful in practical applications.
+
+# 1 The Problem of Credit Assignment
+
+One of the key tasks in artificial intelligence is to construct mathematical and algorithmic solutions to what is known as the grand problem of *credit assignment*. Effective credit assignment reduces to: (i) the identification of which neural processing elements (NPEs), e.g., individual computational units in a computation graph, have an influence on a particular (task-specific) objective functional L(Θ); and (ii) modifying the synapses that connect all of the NPEs based on their degree of influence so as to optimize this objective. The synaptic adjustments that characterize the second step are made to improve the overall performance of the network that the set of NPEs constitutes. From the perspective of error-driven learning and adaptation, credit assignment is typically carried out by computing and assigning error values to each NPE based on the cost L(Θ) and, once these values have been obtained, yielding ∆ (the set of all adjustments to be made to the synapses within Θ), the current values of the ANN's parameters are consequently updated.
+
+Note that, historically, error-driven adjustment of the kind described above has been theorized [59, 13] and experimentally observed in biological neuronal networks [75]. The problem with how this error is computed and allocated in modern-day ANNs – via backpropagation of errors [32] (backprop) – is essentially what is considered to be neurobiologically implausible. Given the significant successes of modern deep learning, addressing this implausibility may seem a niche task of interest to neuroscientists alone. However, this is far from true; despite recent breakthroughs, important advancements are still required. Two of these include the need to: 1) develop more robust and more general human-like capabilities, in service of the grander goal of constructing intelligent machines, and 2) to construct faster, more energy efficient procedures for training and conducting inference in such models. Biologically-plausible credit assignment approaches offer a potential solution to both of these problems.
+
+Biologically-plausible (bio-plausible) credit assignment is suitable for neuromorphic hardware implementations due to the *locality* of their operations and synaptic updates. When translated to hardware, locality enables the full parallelization of operations, with low latency, low power consumption, and often without supervision. This is different from processing in existing Von-Neumann architectures, where the division between memory and computing units makes such operations slower and computationally expensive. Locality of operations is also a key property that enables the training of networks with cyclic and entangled topologies, like those of neural circuits, without the need to save gradients in memory, as is required by backprop through time [63, 22, 62].
+
+To develop such neuroscience-inspired algorithms, researchers have looked to the neuronal cells that make up animal and human brains, crafting approaches that conduct 'credit assignment' [3] in a fashion more analogous to neurobiological dynamics and information processing. Historically, these efforts have drawn from insights and findings in neuroscience, cognitive science, and biophysics. Today, a large amount of this research focuses on developing energy-based, forward only, or spiking algorithms that are stable and perform reasonably well on standard deep learning tasks [69, 61, 9, 22]. The aim of this work is to survey these algorithms and procedures.
+
+Organization of the Review. This survey is organized in the following manner: In Section 1, we briefly describe several of the key criticisms of credit assignment conducted via backpropagation of errors (BP); In Section 2, we turn to the examination of several emergent paradigms in the realm of neuroscience-oriented algorithms for credit assignment; In Section 3, we discuss potential of neuromprphic systems. In light of the learning and credit assignment schemes studied, in Section 4, we consider important open questions and challenges facing research in neuroscience-inspired machine learning as well as promising problem domains in which advances might be made. Finally, we conclude this targeted survey with final remarks.
+
+### 1.1 What is Wrong with Backprop?
+
+Despite its impressive empirical successes, BP-based credit assignment is still considered biologically implausible in the brain. We next discuss some of the major criticisms, while the rest of the survey will focus on neuroscienceinspired algorithms that ameliorate some of these issues.
+
+Weight Transport (WT). This term refers to models that use the same set of weights to perform both the forward and backward passes. In neural networks trained with backprop, presynaptic NPEs receive error gradient information from postsynaptic ones via the same synaptic connections that were used to originally forward propagate information. This operation is implausible in the chemical synapses of the brain, where unidirectional flow of information is enforced by neurotransmitters and receptors. In neuromorphic chips, where physical components are used to emulate biological synapses, implementing bi-directional connections may be problematic, depending on the considered hardware [31, 78].
+
+Forward Locking (FL). This term refers to the requirement that the neural activities in one layer of a network cannot be computed until the activities of all preceding layers have been computed. This sequential dependency creates a bottleneck in information processing and is a departure from the parallel, distributed nature of computation in biological networks [17]. Furthermore, this requires storage of the neurons' values in memory, which is challenging to implement on local and parallel neuromorphic hardware.
+
+Backward Locking (BL). Similarly, update/backward locking refers to the delay in computing teaching signals and synaptic updates for a layer until the teaching signals in the subsequent layers have been computed. This dependency is also at odds with the local, parallel processing observed in biological neural systems [17].
+
+Forward-Backward Differentiation (FBD). In backprop, the forward and backward passes utilize different computations. The forward pass transmits information across the network, while the backward pass produces gradient information. This divergence in computation between the two passes is seen as implausible and contrasts sharply with the localized and time-constrained plasticity of real synaptic connections [78, 30].
+
+# 2 Neuroscience-Inspired Credit Assignment
+
+In this section, we examine several prominent and promising credit assignment paradigms, that have recently garnered a growing body of theoretical and empirical support. To study these credit assignment processes, we draw inspiration from [36], and reformulate the most general form of each scheme in light of what compound
+
+| Term | Definition |
+| --- | --- |
+| PC | Predictive Coding |
+| FL | Feedback Alignment |
+| BL | Backpropagation Learning |
+| FO | Forward Only Learning |
+| LRA | local representation learning |
+| FL | Forward Locking |
+| BL | Backward Locking |
+| WT | Weight Transport |
+| FBD | Forward Backward Computation |
+| Parallel | Parallel learning |
+| Async. | Asynchronous inference and Learning |
+| 1-compute | No divergence in computation |
+| No-diff | Differentiation not required |
+| Sparsity | Sparse learning signals and architecture |
+
+Table 1: Terms/acronyms reference table.
+
+global energy functional that it can be stated to be optimizing. In most of the algorithms considered here, the energy functional will be divided in two terms, L(ΘL), defined on the output layer and related to the objective of the specific task, and E(Θ) (note that Θ = ΘL ∪ {Θℓ} L−1 ℓ=1 where Θℓ contains parameters for layer ℓ), related to the internal energy of the model, that allows learning via local messages:
+
+${\cal F}(\Theta)=\beta{\cal L}(\Theta_{L})+\alpha{\cal E}(\Theta)$.  
+  
+
+Notation. The key notation and symbols that will be commonly used throughout this article is presented here. A bold-font capital character, e.g., M, is used to represent a matrix while a lowercase bold one, e.g., v, represents a vector. Mij effectively retrieves a scalar at position (i, j). In terms of operations, matrix-matrix/vector multiplication is shown as ·, a Hadamard product is denoted by ⊙, and (v) T indicates the transpose of v. An elementwise function, e.g., an activation function, will typically be represented by ϕ(v) and ∂ϕ(v) is its first derivative with respect to its input v. Generic functions are represented with an italicized letter with a subscript denoting what parameters or subset of parameters it depends on, e.g., fΘ() which depends on parameter values inside the model parameter construct Θ.
+
+#### 2.1 Backpropagation of Errors
+
+The general form of the objective that backpropagation (backprop) is used to optimize can be extracted from an energy functional with the form depicted as follows:
+
+$${\cal F}(\Theta)=\beta{\cal L}(\Theta)\Big{|}_{\beta=1}+\alpha{\cal E}(\Theta)\Big{|}_{\alpha=0}={\cal L}(\Theta),\tag{2}$$
+
+where α and β are sensitivity hyperparameters/coefficient. Specifically, for backprop, we see that the coefficient which weights the internal local objectives – E(Θ) – is set to zero (α = 0), reducing optimization to exclusively using the task-centric cost.
+
+Learning Dynamics. To optimize Equation 2, reverse-mode differentiation is used to calculate the partial derivatives of F(Θ) with respect to Θ, which are then subsequently used to carry out a step of gradient descent. This reverse-mode differentiation consists of two operations or phases: a forward pass, that assigns values to every neuron of the network, and a backward pass, that performs credit assignment by backpropagating information about the gradients of L(Θ), one layer at the time. The backward pass is performed using the same weight matrices of the forward pass, causing the WT problem described earlier. Furthermore, the sequentiality of the three phases – forward pass, backward pass, and weight update – forces the saving of the values computed during each phase before starting the following one, causing the problems of FL and BL.
+
+#### 2.2 Predictive Coding
+
+Background. Predictive coding is a general theory of cortical function which draws inspiration from computational neuroscience, signal processing, and Bayesian inference [12, 59, 61, 73]. Predictive coding (or PC) argues that the fundamental principle underlying cortical computation is that of minimizing prediction error: neurons predict their input and output neurons – typically in a layerwise hierarchy which means that neurons predict the
+
+![](_page_3_Figure_1.jpeg)
+
+Figure 1: Visualization of the mechanics inherent to predictive coding (PC), contrastive Hebbian learning (CHL), and forwardonly learning (specifically signal propagation) when conducting supervised learning. A reddish-orange diamond represents an error neuron (a mismatch signal) while a pinkish circle represents an NPE. Black solid arrows represent synaptic pathways, thicker blue arrows represent non-synaptic transmission pathways (e.g., copying a vector, concatenation, vector-splitting, etc.), and red-dashed arrows just represent the inputs that enter a local energy function. Note that some visualized algorithms (PC, CHL) entail an iterative settling process that is not depicted.
+
+activities of the layer below them. Information about the discrepancies in these predictions are relayed upwards through the hierarchy, serving as the basis for parameter adjustment. In machine learning, recent studies have explored the efficacy of this algorithm across a diverse array of tasks and problem domains, encompassing areas like computer vision, natural language processing, graph learning, and associative memories [37, 56, 76, 51, 64] where predictive coding networks have been shown to perform on par with backpropagation at training complex machine learning architectures. PC has also been shown, in certain limits, to closely approximate backpropagation of errors [78, 36, 72, 66].
+
+Learning Dynamics. The energy function underlying predictive coding circuitry is as follows:
+
+$${\cal E}(\Theta)=\sum_{\ell=1}^{L-1}{\cal C}({\bf z}^{\ell},f_{\Theta_{\ell}}({\bf z}^{\ell-1}),{\bf\Sigma}^{\ell})\tag{3}$$
+
+where the local measurement takes the following form:
+
+$${\cal C}({\bf z}^{\ell},f_{\Theta_{\ell}}({\bf z}^{\ell-1}),{\bf\Sigma}^{\ell})=-\frac{1}{2\Sigma^{\ell}}\left|\left|{\bf z}^{\ell}-f_{\Theta_{\ell}}({\bf z}^{\ell-1})\right|\right|_{2}^{2}\tag{4}$$
+
+noting that Σ ℓ is a scalar covariance weighting associated with layer ℓ and is typically treated as part of Θℓ. Note that, in some variations of PC, Σ ℓ is a learned covariance matrix (and its inverse is referred to as the precision); we do not treat this form here and refer the reader to [61] for details.
+
+To optimize the functional in Equation 3, gradients are taken, for each layer, with respect to both the neural activity – ∂E(Θ) ∂zℓ – and the parameters – ∂E(Θ) ∂Θℓ – to conduct a form of expectation maximization (EM) [7]. For all layers ℓ = 1, ..., L, neural activity values, initialized to base condition values, are iteratively adjusted via a form of z ℓ ← z ℓ − γ ∂E(Θ) ∂zℓ for T steps (the E-step). Once activities have been updated, each layer's parameters are updated with one application of Θℓ ← Θℓ −γ ∂E(Θ) ∂Θℓ (M-step). Although the optimization of a PC circuit generally follows the gradient flow induced by the free energy functional of Equation 3, the updates to local parameters Θℓ can be written down as multi-factor Hebbian rules. Furthermore, various research efforts have demonstrated that the message passing of error information between layers can be done with decoupled feedforward and feedback synaptic pathways [51, 61].
+
+#### 2.3 Contrastive Hebbian Learning
+
+Background. Schemes that fall under the framework of contrastive Hebbian learning (CHL) [81], directly utilize an energy based model that relaxes to solutions. In CHL algorithms such as equilibrium propagation (EP) [70], two different phases are required to perform credit assignment: a prediction/unclamped phase, where energy is particularly minimized in order to make a prediction based only on the input data, and a learning/clamped phase, where the output neurons are nudged towards a supervised signal. Once both phases are complete, parameters are adjusted using the difference in the equilibria of the two phases. In general, any CHL algorithm aims to adjust synaptic weight values leveraging conditioned iterative computation phases, with origins grounded in Hopfield network-centric [40], Boltzmman-based learning [16], and Helmholtz and neural heat exchange machines [71, 6].
+
+Like many bio-plausible alternatives to backprop, CHL schemes have been shown to approximate backprop as well as recurrent backprop [68]. This approximation occurs as the strength of the nudging becomes infinitesimal, resulting the difference between the phases resembling a finite-difference gradient [36]. Other efforts have developed theory for EP, casting it in terms of a type of bilevel optimization [85]. However, the original formulations of CHL schemes such as EP generally fail to scale up to complex tasks; to address this issue, variations of this CHL/EP have been designed that improve efficiency as well as performance on particular tasks [24, 70, 27]. In addition, [25] defined the underlying energy function on the complex plane, which allows to avoid 'nudging' via iterative computational steps, resulting in a more robust algorithm.
+
+Learning Dynamics. For processes that adjust parameters values under the framework of contrastive Hebbian learning (CHL), the following energy functional serves as the central guide of the learning dynamics:
+
+$${\cal E}(\Theta)=\sum_{\ell=1}^{L-1}\left({\cal C}({\bf z}^{\ell};\Theta_{\ell})-{\cal C}({\bf c}^{\ell};\Theta_{\ell})\right)\tag{5}$$
+
+where z ℓ represents the incoming neural activity produced by running the neural system in a 'positive' phase and c ℓ represents activity generated by running the system in a 'negative' phase. The simplest possible local objective takes the form of Hopfield energy [40]:
+
+$${\cal C}({\bf z}^{\ell};\Theta_{\ell})=-({\bf z}^{\ell-1})^{\sf T}\cdot{\bf W}^{\ell}\cdot{\bf z}^{\ell}.\tag{6}$$
+
+To optimize the energy underlying a CHL system, gradients may be taken of the local Hopfield energy with respect to local parameters which results in a pair of two-term Hebbian rules: ∂C(z ℓ ,z ℓ−1 ;Θℓ) ∂Θℓ = −z ℓ · (z ℓ−1 ) T and ∂C(c ℓ ,c ℓ−1 ;Θℓ) ∂Θℓ = −c ℓ · (c ℓ−1 ) T . These result, when expressed in terms of gradient ascent, in synaptic updates in the form shown below:
+
+$$\Delta{\bf W}^{\ell}=\left({\bf z}^{\ell}\cdot({\bf z}^{\ell-1})^{T}\right)-\left({\bf c}^{\ell}\cdot({\bf c}^{\ell-1})^{T}\right).\tag{7}$$
+
+In order to obtain the necessary statistics for the local gradient terms for Equation 7, a set of two conditioned dynamics is simulated in order to obtain the neural activity values required for computing local gradients. To do so, the equations that govern the system's dynamics are iteratively applied. These dynamics can be summarized in the following manner:
+
+$${\bf z}^{\ell}\leftarrow(1-\gamma){\bf z}^{\ell}+\gamma({\bf W}^{\ell}\cdot{\bf z}^{\ell-1}+({\bf W}^{\ell+1})^{T}\cdot{\bf z}^{\ell+1})\tag{8}$$
+
+where we notice that neural activities change as a result of repeated local bottom-up and top-down synaptic transmission of nearby layer values. First, for each layer, Equation 8 is applied T times (after initializing activities), with the exception of the bottom and topmost layers – these are clamped to sensory and context values, i.e., z 0 = x and z L = y, respectively – to obtain the set of values {z ℓ,+} L ℓ=0 (positive phase statistics). Next, the topmost layer is then un-clamped and the same dynamics for each layer (still keeping the bottom layer fixed to sensory input) are further run for an additional T steps to obtain {z ℓ,−} L ℓ=0 (negative phase statistics).
+
+Equilibrium Propagation. Despite being a general technique, that can be applied to other energy-based models, such as predictive coding, we have decided to include equilibrium propagation (EP) in the same section of CHL, as most of the literature of EP focuses on models that largely learn using the CHL energy of Equation 5 [70, 69]. Generally speaking, however, EP consists in defining the energy term of the output layer L(ΘL) in terms of small local perturbations: first, an equilibrium is reached by minimizing the internal energy E(Θ) (hence, setting β = 0). Then, the output layer is *nudged* towards the output signal by setting β > 0, but keeping is relatively small. At this point, learning happens as usual, where the energy to be minimized is a weighted combination E(Θ) + βL(ΘL).
+
+#### 2.4 Forward-Only Learning
+
+Background. In recent years, a different set of biologically-plausible algorithms have emerged that avoid introducing or using feedback pathways that facilitate credit assignment. These have been often labeled as 'forwardonly' schemes [23, 22] and generally construct a means of synaptic adjustment that relies on solely the forward
+
+| Method |  |  | BP Constraints Resolved |  |  |  | New Capabilities |  |  | Code/Software | Spiking Impl. | Hardware Impl. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  | WT | FL | BL | FBD | parallel | async. | 1-compute. | sparsity | no-diff |  |  |  |
+| PC | + | + | + |  | - |  |  |  | + | [43, 77, 4, 73] | [60, 48] |  |
+| CHL |  | + | + |  |  |  | + |  | + |  | [41, 33] | [84, 46, 11] |
+| FO | + | + | + | + | + | + | + | + | + | [21, 53] | [22, 47] | [45] |
+| DFA | + |  | + |  | + |  |  | + |  |  | [67, 83] | [10] |
+| TP | + |  |  | + | + |  | + |  | + |  |  |  |
+| LRA | + |  | + |  | - | - |  | + | + |  |  |  |
+
+Table 2: What issues of backprop does each biologically-plausible learning algorithm resolve and what new capabilities does it open? '+' = full or '-' = partial resolution of issue or availability of new capability (empty means no addressal of issue).
+
+inference process of a neural system. Some variations leverage the label as context information and run this through the feedforward propagation pathway [23, 22] while others employ a mechanism for auto-generating adversarial 'negative' data samples as context information that are then run through the feedforward pathway [15, 52] (i.e., such schemes minimize the "goodness" of adversarial data points and maximize goodness for those taken from the original dataset). Forward-only schemes have been generalized to spiking networks [47] and have also been demonstrated to work on neuromorphic chips [80].
+
+Learning Dynamics. Although variations to the theme of forward-only (FO) exist, one may generically view any such scheme as optimizing the following functional:
+
+$${\cal E}(\Theta)=\sum_{\ell=1}^{L-1}{\cal C}({\bf z}^{\ell},{\bf c}^{\ell};\Theta_{\ell})\tag{9}$$
+
+which is effectively a summation of local comparative or contrastive functions, depending on the variant of FO adaptation that is employed. For example, in signal propagation [22], one could employ a vector similarity measurement as follows:
+
+$${\cal C}({\bf z}^{\ell},{\bf c}^{\ell};\Theta_{\ell})=\frac{({\bf c}^{\ell})^{\sf T}\cdot{\bf z}^{\ell}}{||{\bf z}^{\ell}||_{2}{\bf z}^{\ell}||_{2}}\tag{10}$$
+
+or a contrastive measurement as in the forward-forward procedure [15]:
+
+$$\mathcal{C}(\mathbf{z}^{\ell},\mathbf{c}^{\ell};\Theta_{\ell})=\begin{cases}\log p(c=1;\mathbf{z}^{\ell})&\text{if}\mathbf{x}\sim\mathcal{D}\\ \log\left(1-p(c=1;\mathbf{c}^{\ell})\right)&\text{if}\mathbf{x}\sim\mathcal{D}^{neg}\end{cases}\tag{11}$$
+
+which is a simplified presentation of 'goodness' in terms of a logistic regression objective. Notice that in Equation 11, we make clear that the activity vector z ℓ is the product of sampling an input pattern from the original dataset D whereas c ℓ is sampled from a negative/adversarial data distribution Dneg .
+
+To optimize Equation 9, a reverse-mode differentiation may be used to calculate the partial derivatives of L(ΘL) and C(; Θℓ) with respect to Θℓ for each layer (or block) ℓ. These local gradients are then subsequently used to carry out a step of a variation of a first-order (or n-order) optimization process, such as Adam, to update parameters [22, 15]. Alternatively, a Hebbian learning update rule may be used to calculate the values needed for updating the parameters in tandem with an optimizer, such as Adam [23].
+
+#### 2.5 Other Learning Schemes
+
+Although this review focuses on three prominent bio-plausible frameworks, there is an expanding plethora of others being developed that have garnered the machine learning community's interest. Four key emerging approaches that we review here are direct feedback alignment (DFA) [44], target propagation (TP) [28, 1], local representation alignment (LRA) [54], and SoftHebb [38].
+
+Direct Feedback Alignment. Feedback alignment approaches focus on resolving the weight transport problem. An early effort, random feedback alignment [31], used fixed random feedback projections to generate teaching signals for each layer (as opposed to the transpose of the feedforward weights). DFA, on the other hand, introduced random feedback matrices that directly projected the output error to individual layers. It is worth noting that this method has shown good performance on large-scale datasets [39, 26], as well as promising implementation on photonic chips, given that it does not require layers to be updated sequentially during the backward pass. This enables DFA to be suitable for parallelization using photonics [10]. Other variations incorporate mechanisms for learning the feedback matrices (instead of keeping them random/fixed) [29].
+
+| Domain & Problem Solved | Method |
+| --- | --- |
+| Physics | CHL, FO, LRA, TP |
+| Does not require differentiation |  |
+| Hardware | FO |
+| Only needs inference architecture for learning |  |
+| Optics/Physical Systems | FO, PC |
+| No need to characterize complex physical systems |  |
+| Physical Devices | FA, PC, FO |
+| Analog information processing |  |
+| Neuroscience | PC, FO |
+| Fits complex neuronal models of learning |  |
+
+Table 3: A reference table for selecting the biologically-plausible learning method(s) that best fit(s) a specific (application) domain or solve a particular problem.
+
+Target Propagation. Target propagation (TP) tackles the BP's problematic use of different operations for the forward and backward passes. Instead of gradients, TP backpropagates target (vector) signals. Each pair of layers in a TP-trained network is treated as a shallow autoencoder where each layer tries to reconstruct the one below it, learning a local function and its (approximate) inverse. Notably, each autoencoder is designed with separate forward and backward connections and local rules are used to adjust their values. Recent theoretical work has improved the stability of TP and demonstrated its connection to Gauss-Newton optimization [35, 2].
+
+Local Representation Alignment. This bio-plausible algorithm can be viewed as a hybrid between TP and PC, engaging in a 'coordinated local learning' process that minimizes a set of summed representation distance measurements [54]. LRA-based approaches produce teaching signals by first adjusting layer-wise activities with an error modulated perturbation and then calculating local weight updates; notably, LRA can be recursively decomposed to produce asynchronous, parallel adjustments to portions of a network architecture, especially for larger convolutional neural systems [55, 82, 20].
+
+SoftHebb. A noteworthy, recent line of work focuses on Hebbian adaptation, augmented with a soft winner-takeall activation function. In a fashion similar to PC, this algorithm can be shown to represent and learn a Bayesian generative model of the data [38]. When used for standard deep learning tasks, such as image classification, these algorithms have been shown to perform as well as other biologically plausible algorithms, also avoiding many of the implausibilities mentioned above [19].
+
+# 3 Neuromorphic Systems
+
+Modern neuromorphic systems often aim to inscribe an ANN into an equivalent analog circuit [5]. Currently, the best results are achieved by training a digital ANN on existing hardware and then transferring the synaptic weight values to the analog device. After transfer, there may be limited tuning of the ANN on the analog device. This limitation is primarily due to the lack of effective and scalable neuromimetic learning algorithms which can run natively in the analog domain, which many of the algorithms reviewed in this paper can do. The motivation of analog hardware is to bypass the escalating energy, computation, and financial burden of running ANNs on the digital intermediary layer. Instead, ANNs are implemented directly in the more efficient and scalable hardware layer. The eventual goal is to surpass the performance of digital artificial neural networks, not merely retain their performance at a lower cost.
+
+The current iteration of neuromorphic systems have much lower energy usage compared to equivalent digital hardware. However, they struggle to reach the growing level of digital ANN design complexity/scale – key features accredited with the success of modern digital ANNs. Therefore, there are few applications where performance is comparable [5]. This is due both to the ever-increasing size of state-of-the-art models, which cannot fit inside a single GPU, let alone on a single analog device, as well as the rapid pace of neural architecture development compared to hardware design.
+
+These limitations of neuromorphic systems are due to constraints imposed by the architectural design of ANNs in hardware, when moving from the digital to analog domain [42]. However, many constraints faced by biological systems and those imposed by analog hardware are very similar. Moreover, the potential improvements in energy and compute efficiency of analog hardware is substantial. This naturally points towards a synergy between machine learning, neuroscience, and hardware design.
+
+# 4 Future Directions for Research
+
+While there has been significant progress and activity in recent years, biologically inspired (bio-inspired) learning methods have not yet reached the consistent and strong performance of backpropagation (backprop), which has been able to surpass human performance in multiple tasks. One of the grander goals in the field is to emulate the performance of backprop while retaining bio-plausible credit assignment. There are several research direction that would allow us to bridge this gap. Theoretically, we need to better understand the trajectory of learning and the final model state when learning with backprop as compared to bio-inspired credit assignment, and use this knowledge to understand which methods, or (the more likely) combination of methods, to focus future efforts on. In practice, empirical progress in the field will be obtained by adopting more of the methodology and techniques seen in machine learning research using backprop, including architecture design, regularization, and data processing. Most importantly, as this is an interdisciplinary field, potential breakthroughs will come if we manage to stimulate the involvement of broader and diverse scientific communities.
+
+### 4.1 Open Problems
+
+Flexible Libraries. The first limitation to address in the field is the absence of a suitable software library (a notable exception is [43]), similar to Pytorch or Tensorflow, in the sense that it provides flexibility and adaptability with different data sources and can use efficiently use varied computational resources such as GPUs, CPUs, TPUs for faster training. Furthermore, to encourage active participation in this domain from those who do not have backgrounds in cognitive science or computational neuroscience/biophysics, there is a need to develop high-level APIs, similar in spirit to Keras, or design a plug-and-play-style environment.
+
+Stability. There is a need for theoretical understanding concerning convergence guarantees and the stability of bio-plausible approaches. Recent work on energy-based models, e.g., equilibrium propagation and predictive coding, are failing to generalize to very deep architectures, e.g., ResNets, and the best results available are limited to Alexnet or small VGGNets [65, 69], models that are now about a decade old. A robust mathematical theory would provide essential insights into the conditions under which these alternative methods converge, their rate of convergence, and their stability across various network architectures and data distributions. This will be crucial for scaling these architectures to complex, deeper architectures as well as for applications in fields where reliability and precision are paramount, e.g., autonomous systems, medical diagnostics, and financial modeling. Such a theory would also guide the design of neural systems that are more resilient to the quality of initial parameters and training data, thereby enhancing the efficacy and efficiency of the training process.
+
+Dynamics. Implementations of such algorithms on edge devices will most likely need to handle dynamical environments. However, as of today, most research focuses on modelling static data. An invaluable direction of research would be to focus on time series data, such as next-frame prediction tasks. To this end, future efforts should focus on implementing bio-plausible update rules for deep learning models such as LSTMs, or for models inspired from control theory, such as Kalman filters. A successful example of such efforts, still on small-scale tasks, are works that use predictive coding to model active inference agents [50].
+
+# 4.2 Mortal Computation and Structural Evolution
+
+Many of the neuroscience-inspired credit assignment algorithms reviewed here contain components such as energy minimization that are well adapted to analog and neuromorphic hardware [14, 5], yet are not necessarily competitive with backprop on digital hardware. This has inspired the possibility of designing specialized hardware for these algorithms which could theoretically obtain substantial improvements in speed, cost, and power-efficiency. At a hardware level, efficiency gains can only be achieved by utilizing the natural physics of the hardware to achieve the desired computation instead of 'emulating' it digitally. The downside of this is that computations are unavoidably affected by natural variability in the hardware introduced during the manufacturing process. While neural learning algorithms can route around these differences, this means that each network is intrinsically tied to and specialized for its physical hardware implementation in a way not true of purely digital programs. In effect, such neural computation is 'mortal' [49] since it cannot escape the destruction of its hardware substrate. Neuromimetic algorithms hold the promise of being able to run effectively on such hardware, driving large gains to the efficiency of their models, at the cost of them becoming mortal.
+
+In complement to the above point on structural substrate, we remark that investigating the combination and integration of biological learning schemes with forms of neuro-evolution, e.g., NeuroEvolution of Augmenting Topologies [74] (NEAT), and/or swarm intelligence [8], e.g., particle swarm optimization, could prove useful. Importantly, this line of inquiry would present a unique opportunity for constructing dynamical systems that automatically discover optimal network topologies for a given problem, potentially leading to more efficient neuronal structures overall. Furthermore, in theory, NEAT can adapt networks in dynamic environments, a trait beneficial to reinforcement learning and other areas where the problem space changes over time.
+
+#### 4.3 Application of AI in Science
+
+The increasing popularity of AI has motivated applications in various scientific areas such as physics [57], chemistry [18], health [58], and biology, as well as on unconventional devices such as physical devices [79] and optics [45]. Such computational devices, that rely on brain-like analog information processing, are still mostly based on backprop-based schemes that are unsuitable for physical implementation. In some cases, however, this is problematic. Physics-based neural network (PINNs), for example, suffer from two major drawbacks: first, they cannot find the actual solution when coupled with first-order optimization based on gradient descent, and need computationally expensive second-order quasi-newton optimization to work well; second, PINNs are still equipped with feed-forward connections and cannot efficiently capture temporal and spatial relationships due to difficulties in optimization and poor generalization guarantees [57]; third, PINNs center around the necessity of having a differentiable activation function, which restricts their usage in most scientific areas and problems. On the other hand, bio-inspired alternatives overcome most of these issues. Approaches such as local representation alignment, predictive coding, and forward-only learning can work with non-differentiable activation functions [23, 54]. Additionally, target propagation [2] and PC-based methods approximate quasi-Newton optimization, thus providing better gradients and are thus well-suited for physical implementation and applications in science.
+
+# 5 Discussion and Conclusion
+
+Impact in the Neurosciences. Understanding the nature of credit assignment in the cortex is one of the fundamental goals in neuroscience and finding answers to the questions related to it would provide us with direct insight into many other fundamental questions related to brain function and organization. Deep learning, a close cousin of neuroscience, is now able to reach and surpass human-level performance on many tasks, solving problems similar in spirit to what the brain does using the backpropagation of errors algorithm, which is highly neuroscientifically implausible. However, machine learning problems and networks provide an invaluable test-bed to experiment with and to test the capabilities of more bio-plausible algorithms. While such experiments do not provide direct neuroscientific evidence, they can both test the capabilities of such algorithms (given that algorithms which cannot train even small neural systems are highly unlikely to be viable in the brain) as well as be used to quickly and easily test hypotheses in artificial neural networks which can then be verified (or not) by neuroscientific investigation. In the last decade, a number of significant algorithms, which are reviewed in this work, have been proposed as solutions to the problem of cortical credit assignment. While these can serve as starting points for development, there remain many open problems both in improving, scaling, and testing the capabilities of these algorithms, as well as experimentally checking the claims that they imply about cortical processing.
+
+Conclusion. In this survey, we have described several important biologically-plausible algorithms for credit assignment in artificial neural networks, and discussed how they address several key drawbacks of backpropagationbased models. Despite not being yet prominently used in practical applications, progress in this direction would facilitate the training of deep neural networks using only local computations, a fundamental aspect of distributed computing and implementations on neuromorphic hardware. However, while this survey is primarily directed at computer scientists as well as machine learning engineers and practitioners, the field of neuromorphic computing is cross-disciplinary, as it touches fields like physics, material science, neuroscience, chemistry, and computer science [34]. By highlighting this interdisciplinarity, we aim to foster a more unified research landscape, enhancing accessibility for various disciplines to comprehend, improve, and apply these methods and frameworks effectively.
+
+To conclude, to ensure that progress goes in the right direction, it is important to reason about where such neuromimetic algorithms will be able to play a role in terms of real-world applications. Important examples include edge computing devices and autonomous neurorobotic systems, where energy efficiency is critical and computational parallelism is invaluable. Looking forward, identifying and targeting application-specific requirements will be key in steering the research related to biologically-inspired credit assignment algorithms towards solving real-world problems and challenges.
+
+# References
+
+- [1] BENGIO, Y. How auto-encoders could provide credit assignment in deep networks via target propagation. *arXiv preprint arXiv:1407.7906* (2014).
+- [2] BENGIO, Y. Deriving differential target propagation from iterating approximate inverses. *arXiv preprint arXiv:2007.15139* (2020).
+- [3] BENGIO, Y., AND FRASCONI, P. Credit assignment through time: Alternatives to backpropagation. *Advances in neural information processing systems 6* (1993).
+- [4] CHOKSI, B., MOZAFARI, M., O'MAY, C. B., ADOR, B., ALAMIA, A., AND VANRULLEN, R. predify. https://github.com/miladmozafari/predify, 2020.
+- [5] DAVIES, M., WILD, A., ORCHARD, G., SANDAMIRSKAYA, Y., GUERRA, G. A. F., JOSHI, P., PLANK, P., AND RISBUD, S. R. Advancing neuromorphic computing with loihi: A survey of results and outlook. *Proceedings of the IEEE 109*, 5 (2021), 911–934.
+- [6] DAYAN, P., HINTON, G. E., NEAL, R. M., AND ZEMEL, R. S. The helmholtz machine. *Neural computation 7*, 5 (1995), 889–904.
+- [7] DEMPSTER, A. P., LAIRD, N. M., AND RUBIN, D. B. Maximum likelihood from incomplete data via the EM algorithm. *Journal of the royal statistical society: series B 39* (1977).
+- [8] EBERHART, R. C., SHI, Y., AND KENNEDY, J. *Swarm intelligence*. Elsevier, 2001.
+- [9] ERNOULT, M., NORMANDIN, F., MOUDGIL, A., SPINNEY, S., BELILOVSKY, E., RISH, I., RICHARDS, B., AND BENGIO, Y. Towards scaling difference target propagation by learning backprop targets, 2022.
+- [10] FILIPOVICH, M. J., GUO, Z., AL-QADASI, M., MARQUEZ, B. A., MORISON, H. D., SORGER, V. J., PRUCNAL, P. R., SHEKHAR, S., AND SHASTRI, B. J. Silicon photonic architecture for training deep neural networks with direct feedback alignment. *Optica 9*, 12 (2022), 1323–1332.
+- [11] FOROUSHANI, A. N., ASSAF, H., NOSHAHR, F. H., SAVARIA, Y., AND SAWAN, M. Analog circuits to accelerate the relaxation process in the equilibrium propagation algorithm. In *2020 IEEE International Symposium on Circuits and Systems (ISCAS)* (2020), IEEE, pp. 1–5.
+- [12] FRISTON, K. Learning and inference in the brain. *Neural Networks 16*, 9 (2003), 1325–1352.
+- [13] FRISTON, K. A theory of cortical responses. *Philosophical Transactions of the Royal Society B: Biological Sciences 360*, 1456 (2005).
+- [14] GROLLIER, J., QUERLIOZ, D., CAMSARI, K., EVERSCHOR-SITTE, K., FUKAMI, S., AND STILES, M. D. Neuromorphic spintronics. *Nature electronics 3*, 7 (2020), 360–370.
+- [15] HINTON, G. The forward-forward algorithm: Some preliminary investigations. *arXiv preprint arXiv:2212.13345* (2022).
+- [16] HINTON, G. E. Training products of experts by minimizing contrastive divergence. *Neural computation 14*, 8 (2002), 1771–1800.
+- [17] JADERBERG, M., CZARNECKI, W. M., OSINDERO, S., VINYALS, O., GRAVES, A., AND KAVUKCUOGLU, K. Decoupled neural interfaces using synthetic gradients. *arXiv preprint arXiv:1608.05343* (2016).
+- [18] JI, W., QIU, W., SHI, Z., PAN, S., AND DENG, S. Stiff-pinn: Physics-informed neural network for stiff chemical kinetics. *The Journal of Physical Chemistry A 125*, 36 (2021), 8098–8106.
+- [19] JOURNE´, A., RODRIGUEZ, H. G., GUO, Q., AND MORAITIS, T. Hebbian deep learning without feedback. *arXiv preprint arXiv:2209.11883* (2022).
+- [20] KAPPEL, D., NAZEER, K. K., FOKAM, C. T., MAYR, C., AND SUBRAMONEY, A. Block-local learning with probabilistic latent representations. *arXiv preprint arXiv:2305.14974* (2023).
+- [21] KOHAN, A. Signal Propagation: The Library for Forward Learning in Neural Networks, 2022.
+- [22] KOHAN, A., RIETMAN, E. A., AND SIEGELMANN, H. T. Signal propagation: The framework for learning and inference in a forward pass. *IEEE Transactions on Neural Networks and Learning Systems* (2023).
+- [23] KOHAN, A. A., RIETMAN, E. A., AND SIEGELMANN, H. T. Error forward-propagation: Reusing feedforward connections to propagate errors in deep learning. *arXiv preprint arXiv:1808.03357* (2018).
+- [24] LABORIEUX, A., ERNOULT, M., SCELLIER, B., BENGIO, Y., GROLLIER, J., AND QUERLIOZ, D. Scaling equilibrium propagation to deep convnets by drastically reducing its gradient estimator bias. *Frontiers in neuroscience* (2021).
+- [25] LABORIEUX, A., AND ZENKE, F. Holomorphic equilibrium propagation computes exact gradients through finite size oscillations. *arXiv:2209.00530* (2022).
+- [26] LAUNAY, J., POLI, I., BONIFACE, F., AND KRZAKALA, F. Direct feedback alignment scales to modern deep learning tasks and architectures. *Advances in neural information processing systems 33* (2020), 9346–9360.
+- [27] LAYDEVANT, J., ERNOULT, M., QUERLIOZ, D., AND GROLLIER, J. Training dynamical binary neural networks with equilibrium propagation. In *Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition* (2021), pp. 4640–4649.
+- [28] LEE, D.-H., ZHANG, S., FISCHER, A., AND BENGIO, Y. Difference target propagation. In *Proc. ECMLPKDD* (2015).
+- [29] LIAO, Q., LEIBO, J. Z., AND POGGIO, T. How important is weight symmetry in backpropagation? In *Proc. AAAI* (2016).
+- [30] LILLICRAP, T., SANTORO, A., MARRIS, L., AKERMAN, C., AND HINTON, G. Backpropagation and the brain. *Nature Reviews Neuroscience 21* (04 2020).
+- [31] LILLICRAP, T. P., COWNDEN, D., TWEED, D. B., AND AKERMAN, C. J. Random synaptic feedback weights support error backpropagation for deep learning. *Nature Communications 7*, 1 (2016), 1–10.
+- [32] LINNAINMAA, S. The representation of the cumulative rounding error of an algorithm as a taylor expansion of the local rounding errors. *Master's Thesis (in Finnish), Univ. Helsinki* (1970), 6–7.
+- [33] MARTIN, E., ERNOULT, M., LAYDEVANT, J., LI, S., QUERLIOZ, D., PETRISOR, T., AND GROLLIER, J. Eqspike: spike-driven equilibrium propagation for neuromorphic implementations. *Iscience 24*, 3 (2021), 102222.
+- [34] MEHONIC, A., AND KENYON, A. J. Brain-inspired computing needs a master plan. *Nature* (2022).
+- [35] MEULEMANS, A., CARZANIGA, F., SUYKENS, J., SACRAMENTO, J., AND GREWE, B. F. A theoretical framework for target propagation. *Advances in Neural Information Processing Systems 33* (2020), 20024–20036.
+- [36] MILLIDGE, B., SONG, Y., SALVATORI, T., LUKASIEWICZ, T., AND BOGACZ, R. Backpropagation at the infinitesimal inference limit of energy-based models: Unifying predictive coding, equilibrium propagation, and contrastive Hebbian learning. In *International Conference on Learning Representations, 2023* (2023).
+- [37] MILLIDGE, B., TSCHANTZ, A., AND BUCKLEY, C. L. Predictive coding approximates backprop along arbitrary computation graphs. *Neural Computation 34*, 6 (2022), 1329–1368.
+- [38] MORAITIS, T., TOICHKIN, D., JOURNE´, A., CHUA, Y., AND GUO, Q. Softhebb: Bayesian inference in unsupervised hebbian soft winner-take-all networks. *Neuromorphic Computing and Engineering 2*, 4 (2022), 044017.
+- [39] MOSKOVITZ, T. H., LITWIN-KUMAR, A., AND ABBOTT, L. Feedback alignment in deep convolutional networks. *arXiv:1812.06488* (2018).
+- [40] MOVELLAN, J. R. Contrastive Hebbian learning in the continuous Hopfield model. In *Connectionist Models*. Elsevier, 1991, pp. 10–17.
+- [41] NEFTCI, E., DAS, S., PEDRONI, B., KREUTZ-DELGADO, K., AND CAUWENBERGHS, G. Event-driven contrastive divergence for spiking neuromorphic systems. *Frontiers in neuroscience 7* (2014), 272.
+- [42] NEFTCI, E. O., AUGUSTINE, C., PAUL, S., AND DETORAKIS, G. Event-driven random back-propagation: Enabling neuromorphic deep learning machines. *Frontiers in neuroscience 11* (2017), 324.
+- [43] ngc-learn. https://github.com/ago109/ngc-learn, 2021.
+- [44] NØKLAND, A. Direct feedback alignment provides learning in deep neural networks. In *Advances in Neural Information Processing Systems* (2016).
+- [45] OGUZ, I., KE, J., WANG, Q., YANG, F., YILDIRIM, M., DINC, N. U., HSIEH, J.-L., MOSER, C., AND PSALTIS, D. Forward-forward training of an optical neural network. *arXiv preprint arXiv:2305.19170* (2023).
+- [46] OH, S., AN, J., CHO, S., YOON, R., AND MIN, K.-S. Memristor crossbar circuits implementing equilibrium propagation for on-device learning. *Micromachines 14*, 7 (2023), 1367.
+- [47] ORORBIA, A. Contrastive-signal-dependent plasticity: Forward-forward learning of spiking neural systems. *arXiv preprint arXiv:2303.18187* (2023).
+- [48] ORORBIA, A. Spiking neural predictive coding for continually learning from data streams. *Neurocomputing 544* (2023), 126292.
+- [49] ORORBIA, A., AND FRISTON, K. Mortal computation: A foundation for biomimetic intelligence. *arXiv preprint arXiv:2311.09589* (2023).
+- [50] ORORBIA, A., AND KELLY, M. A. A neuro-mimetic realization of the common model of cognition via hebbian learning and free energy minimization. *arXiv preprint arXiv:2310.15177* (2023).
+- [51] ORORBIA, A., AND KIFER, D. The neural coding framework for learning generative models. *Nature communications 13*, 1 (2022), 2064.
+- [52] ORORBIA, A., AND MALI, A. The predictive forward-forward algorithm. *arXiv preprint arXiv:2301.01452* (2023).
+- [53] ORORBIA, A., AND MALI, A. predictive-forward-forward (code-base), 2023.
+- [54] ORORBIA, A. G., AND MALI, A. Biologically motivated algorithms for propagating local target representations. In *Proc. AAAI* (2019), vol. 33, pp. 4651–4658.
+- [55] ORORBIA, A. G., MALI, A., KIFER, D., AND GILES, C. L. Backpropagation-free deep learning with recursive local representation alignment. In *AAAI* (2023), vol. 37.
+- [56] PINCHETTI, L., SALVATORI, T., YORDANOV, Y., MILLIDGE, B., SONG, Y., AND LUKASIEWICZ, T. Predictive coding beyond gaussian distributions. *arXiv preprint arXiv:2211.03481* (2022).
+- [57] RAISSI, M., PERDIKARIS, P., AND KARNIADAKIS, G. E. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. *Journal of Computational physics 378* (2019), 686–707.
+- [58] RAJPURKAR, P., CHEN, E., BANERJEE, O., AND TOPOL, E. J. Ai in health and medicine. *Nature medicine 28*, 1 (2022), 31–38.
+- [59] RAO, R. P., AND BALLARD, D. H. Predictive coding in the visual cortex: a functional interpretation of some extraclassical receptive-field effects. *Nature Neuroscience* (1999).
+- [60] RAO, R. P. N., AND SEJNOWSKI, T. J. Spike-timing-dependent hebbian plasticity as temporal difference learning. *Neural computation 13*, 10 (2001), 2221–2237.
+- [61] SALVATORI, T., MALI, A., BUCKLEY, C. L., LUKASIEWICZ, T., RAO, R. P., FRISTON, K., AND ORORBIA, A. Brain-inspired computational intelligence via predictive coding. *arXiv preprint arXiv:2308.07870* (2023).
+- [62] SALVATORI, T., PINCHETTI, L., M'CHARRAK, A., MILLIDGE, B., AND LUKASIEWICZ, T. Causal inference via predictive coding. *arXiv preprint arXiv:2306.15479* (2023).
+- [63] SALVATORI, T., PINCHETTI, L., MILLIDGE, B., SONG, Y., BAO, T., BOGACZ, R., AND LUKASIEWICZ, T. Learning on arbitrary graph topologies via predictive coding. *Advances in neural information processing systems 35* (2022), 38232– 38244.
+- [64] SALVATORI, T., SONG, Y., HONG, Y., SHA, L., FRIEDER, S., XU, Z., BOGACZ, R., AND LUKASIEWICZ, T. Associative memories via predictive coding. *Advances in Neural Information Processing Systems 34* (2021), 3874–3886.
+- [65] SALVATORI, T., SONG, Y., MILLIDGE, B., XU, Z., SHA, L., EMDE, C., BOGACZ, R., AND LUKASIEWICZ, T. Incremental predictive coding: A parallel and fully automatic learning algorithm. *arXiv preprint arXiv:2212.00720* (2022).
+- [66] SALVATORI, T., SONG, Y., XU, Z., LUKASIEWICZ, T., AND BOGACZ, R. Reverse differentiation via predictive coding. In *Proceedings of the AAAI Conference on Artificial Intelligence* (2022), vol. 36, pp. 8150–8158.
+- [67] SAMADI, A., LILLICRAP, T. P., AND TWEED, D. B. Deep learning with dynamic spiking neurons and fixed feedback weights. *Neural computation 29*, 3 (2017), 578–602.
+- [68] SCELLIER, B., AND BENGIO, Y. Equivalence of equilibrium propagation and recurrent backpropagation. *Neural computation 31*, 2 (2019), 312–329.
+- [69] SCELLIER, B., ERNOULT, M., KENDALL, J., AND KUMAR, S. Energy-based learning algorithms for analog computing: a comparative study. In *Thirty-seventh Conference on Neural Information Processing Systems* (2023).
+- [70] SCELLIER, B., GOYAL, A., BINAS, J., MESNARD, T., AND BENGIO, Y. Generalization of equilibrium propagation to vector field dynamics. *arXiv preprint arXiv:1808.04873* (2018).
+- [71] SCHMIDHUBER, J. A local learning algorithm for dynamic feedforward and recurrent networks. *Connection Science 1*, 4 (1989), 403–412.
+- [72] SONG, Y., LUKASIEWICZ, T., XU, Z., AND BOGACZ, R. Can the brain do backpropagation?—exact implementation of backpropagation in predictive coding networks. *Advances in neural information processing systems 33* (2020), 22566– 22579.
+- [73] SONG, Y., MILLIDGE, B., SALVATORI, T., LUKASIEWICZ, T., XU, Z., AND BOGACZ, R. Inferring neural activity before plasticity as a foundation for learning beyond backpropagation. *Nature Neuroscience* (2024), 1–11.
+- [74] STANLEY, K. O., AND MIIKKULAINEN, R. Evolving neural networks through augmenting topologies. *Evolutionary computation 10*, 2 (2002), 99–127.
+- [75] SUMMERFIELD, C., EGNER, T., GREENE, M., KOECHLIN, E., MANGELS, J., AND HIRSCH, J. Predictive codes for forthcoming perception in the frontal cortex. *Science 314*, 5803 (2006), 1311–1314.
+- [76] TANG, M., SALVATORI, T., MILLIDGE, B., SONG, Y., LUKASIEWICZ, T., AND BOGACZ, R. Recurrent predictive coding models for associative memory employing covariance learning. *PLoS computational biology 19*, 4 (2023), e1010719.
+- [77] TSCHANTZ, A., AND MILLIDGE, B. pypc, 2020.
+- [78] WHITTINGTON, J. C. R., AND BOGACZ, R. Theories of error back-propagation in the brain. *Trends in Cognitive Sciences* (2019).
+- [79] WRIGHT, L. G., ONODERA, T., STEIN, M. M., WANG, T., SCHACHTER, D. T., HU, Z., AND MCMAHON, P. L. Deep physical neural networks trained with backpropagation. *Nature 601*, 7894 (2022), 549–555.
+- [80] WUNDERLICH, T. C., AND PEHLE, C. Event-based backpropagation can compute exact gradients for spiking neural networks. *Scientific Reports* (2021).
+- [81] XIE, X., AND SEUNG, H. S. Equivalence of backpropagation and contrastive hebbian learning in a layered network. *Neural computation 15*, 2 (2003), 441–454.
+- [82] ZEE, T., ORORBIA, A., MALI, A., AND NWOGU, I. A robust backpropagation-free framework for images. *Transactions on Machine Learning Research* (2023).
+- [83] ZHAO, D., ZENG, Y., ZHANG, T., SHI, M., AND ZHAO, F. Glsnn: A multi-layer spiking neural network based on global feedback alignment and local stdp plasticity. *Frontiers in Computational Neuroscience 14* (2020), 576841.
+- [84] ZOPPO, G., MARRONE, F., AND CORINTO, F. Equilibrium propagation for memristor-based recurrent neural networks. *Frontiers in neuroscience 14* (2020), 240.
+- [85] ZUCCHET, N., AND SACRAMENTO, J. Beyond backpropagation: bilevel optimization through implicit differentiation and equilibrium propagation. *Neural Computation 34*, 12 (2022), 2309–2346.
+

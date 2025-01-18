@@ -9,7 +9,7 @@ def main():
     
     if cfg['mode'] == 'generate':
         print("Generating ideas using: ", cfg['generate_llm'], "\nRAG: ", cfg['rag'], "\nResearcher: ", cfg['researcher'])
-        chat = create_client(cfg['generate_llm'], temperature=1)
+        chat = create_client(cfg['generate_llm'], temperature=0.75)
         ideas_df = pd.DataFrame()
         
         for _ in range(cfg['num_ideas']):

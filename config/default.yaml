@@ -1,7 +1,7 @@
 mode: generate
 topic: "Neural Architecture Search (NAS)"
-researcher: "Mehta"
+researcher: "Ha"
 rag: false 
-num_ideas: 3
+num_ideas: 1
 generate_llm: "deepseek"
 review_llm: "deepseek"
